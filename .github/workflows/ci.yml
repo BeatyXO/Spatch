@@ -15,6 +15,7 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements-dev.txt genvm-linter
       - run: python -m pytest tests -q
+      - run: gltest integration/test_direct_mode.py -q
       - run: genvm-lint check contracts/spatch.py
 
   frontend:
@@ -27,6 +28,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install
+      - run: npm ci
       - run: npm test
       - run: npm run build

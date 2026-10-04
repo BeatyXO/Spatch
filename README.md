@@ -1,5 +1,7 @@
 # Spatch — Version-aware dependency security intelligence
 
+Canonical repository: [github.com/BeatyXO/Spatch](https://github.com/BeatyXO/Spatch).
+
 Spatch is a GenLayer Intelligent Contract that maintains a bounded dependency graph of exact software component versions. It verifies package identity before a graph can be sealed, evaluates GHSA advisories against live OSV + GitHub Advisory Database evidence with independent validator reasoning, deterministically propagates security recheck state to dependent components, and preserves vulnerable version history when a patch is staged.
 
 The design target is **stable GenLayer Studionet, chain ID 61999**. The deployer receives no admin or security-review power. Project creation and graph mutation are creator-only; package identity and security-advisory assessments are permissionless.
@@ -66,6 +68,10 @@ The frontend is intentionally distinctive but readable: layered **shades of blue
 ## Deployment status
 
 Pre-deployment. `deployments/studionet.json` and `docs/LIVE_EVIDENCE.md` are placeholders and must only be replaced with real final evidence after deployment. The frontend reads `VITE_CONTRACT_ADDRESS`; no fake contract address is committed.
+
+## Verified advisory fixture
+
+The selected fixture is [GHSA-gmj6-6f8f-6699](https://github.com/advisories/GHSA-gmj6-6f8f-6699) for PyPI `jinja2`: version **3.1.4** is affected and **3.1.5** is the first fixed version. OSV and GitHub Advisory Database agree on the boundary, and deps.dev recognizes both exact package versions. PyPI `flask` **3.0.0** is the verified dependent-node candidate. This source verification does not imply that the on-chain lifecycle has been run; see [live evidence](docs/LIVE_EVIDENCE.md).
 
 ## Final reviewer path after deployment
 

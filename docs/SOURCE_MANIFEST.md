@@ -20,3 +20,16 @@ Spatch never accepts arbitrary evidence URLs. It constructs URLs from bounded pa
 ## Why these sources
 
 deps.dev provides a structured exact-version identity surface. OSV provides machine-readable affected-package/range data. GitHub Advisory Database provides a separate structured advisory representation for the same GHSA object. The combination lets Spatch validate identity deterministically and reserve AI consensus for the genuinely contextual task of applying advisory ranges to locked versions across ecosystems.
+
+## Verified live-lifecycle fixture candidate
+
+The following public fixture was checked against the live sources on 2026-10-04 before any deployment transaction:
+
+- Advisory: [GHSA-gmj6-6f8f-6699](https://github.com/advisories/GHSA-gmj6-6f8f-6699) (CVE-2024-56201), Jinja sandbox breakout through malicious filenames.
+- Vulnerable component: PyPI `jinja2` **3.1.4**. deps.dev returns the exact `PYPI/jinja2/3.1.4` identity.
+- Fixed component: PyPI `jinja2` **3.1.5**. deps.dev returns the exact `PYPI/jinja2/3.1.5` identity.
+- OSV returns the exact GHSA and an ecosystem range introduced at 3.0.0 and fixed at 3.1.5; its listed affected versions end at 3.1.4.
+- GitHub Advisory Database returns the same GHSA, affected range `>= 3.0.0, <= 3.1.4`, and first patched version 3.1.5.
+- The proposed dependent node is PyPI `flask` **3.0.0**, also recognized by deps.dev.
+
+This fixture has an explicit affected/fixed boundary shared by OSV and GitHub. It is a verified fixture selection only; it is not evidence that a live contract lifecycle has run.

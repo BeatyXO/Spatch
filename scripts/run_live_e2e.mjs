@@ -9,7 +9,7 @@
  */
 import { createAccount, createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
-import { TransactionHashVariant } from 'genlayer-js/types';
+import { ExecutionResult, TransactionHashVariant, TransactionStatus } from 'genlayer-js/types';
 
 const [,, contractAddress] = process.argv;
 if (!/^0x[0-9a-fA-F]{40}$/.test(contractAddress || '')) {
@@ -40,15 +40,12 @@ const read = (name, args = []) => reader.readContract({
 });
 
 async function write(client, account, label, name, args) {
-  const call = { address: contractAddress, functionName: name, args, value: 0n };
-  const estimate = await client.estimateTransactionFeesForWrite(call);
-  const hash = await client.writeContract({
-    ...call,
-    account,
-    fees: { distribution: estimate.distribution, feeValue: estimate.feeValue },
-  });
+  const hash = await client.writeContract({ address: contractAddress, functionName: name, args, value: 0n });
   console.log(`${label}.submitted=${hash}`);
-  await client.waitForFinalization({ hash });
+  const receipt = await client.waitForTransactionReceipt({ hash, status: TransactionStatus.FINALIZED });
+  if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
+    throw new Error(`${label} finalized with ${receipt.txExecutionResultName || 'no execution result'}`);
+  }
   console.log(`${label}.finalized=${hash}`);
   return hash;
 }

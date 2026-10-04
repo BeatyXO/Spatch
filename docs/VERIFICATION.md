@@ -1,20 +1,26 @@
 # Verification status
 
-Verification snapshot for the supplied Spatch tree in the Codex sandbox on 2026-10-04. This is not a release or deployment claim.
+Snapshot of the current `main` worktree on 2026-10-04. This is not a release or deployment claim. Changes after baseline commit `22fefe8` are being validated and are not yet pushed.
 
-## Completed
+## Completed locally
 
-- `python -m pytest tests -q`: **15 passed**.
-- `python -m py_compile contracts/spatch.py`: passed.
-- `genvm-lint check contracts/spatch.py` (with `PYTHONUTF8=1`): lint passed (**3 checks**).
+- Existing lightweight suite: `python -m pytest tests -q` — **15 passed**.
+- Python compilation: `python -m py_compile contracts/spatch.py` — passed.
+- GenVM lint: `genvm-lint check contracts/spatch.py` — lint passed (**3 checks**). SDK validation could not finish because the Windows linter cache returned `Access denied` for the extracted runner.
+- Frontend dependencies: installed from the manifest; `frontend/package-lock.json` was generated.
+- Frontend tests: `npm test` — **2 passed**.
+- Frontend production build: `npm run build` — passed with the configured pre-deployment build. Vite reports a large JavaScript chunk advisory.
+- Fixture research: [GHSA-gmj6-6f8f-6699](https://github.com/advisories/GHSA-gmj6-6f8f-6699), Jinja2 3.1.4 affected and 3.1.5 fixed, independently confirmed from deps.dev, OSV and GitHub Advisory Database. Flask 3.0.0 is recognized by deps.dev as the dependent candidate. Details are in `docs/SOURCE_MANIFEST.md`.
+- Official GenLayer Direct Mode tests: **5 cases added** under `integration/test_direct_mode.py`, covering the core lifecycle, replay, patch and recovery, creator/order checks, failed identity sources, stale revisions, custom-validator agreement/disagreement, malformed model output, and graph bounds. The local `gltest` run is blocked before contract loading by `genlayer-test==0.29.2` raising a Windows `PermissionError` while unlinking its stdin temp file. The test cases are wired into CI for its Linux runner; they are not claimed as locally passing.
+- Repository: `https://github.com/BeatyXO/Spatch`; baseline commit `22fefe8` is pushed to `main`.
 
-## Blocked or not run
+## Not completed or verified
 
-- GenVM SDK validation: the linter could not extract its SDK archive; Windows returned `Access denied` under `%LOCALAPPDATA%\\.cache\\genvm-linter\\extracted`.
-- GitHub: `gh auth status` reports both configured GitHub tokens are invalid. No remote repository was created and no push or Actions run occurred.
-- Local Git commits: the ZIP folder and newly created `.git` directory are owned by the host account. The sandbox account cannot write `.git/config` or `.git/index`; therefore the supplied baseline could not be committed and this worktree cannot be certified clean.
-- Direct Mode: no additional `genlayer-test` tests were added or executed.
-- Frontend: `npm install` did not complete in this environment. `npm test` and `npm run build` were attempted but failed because `vitest` and `tsc` are not installed. No lockfile was generated.
-- Real GHSA fixture, Studionet deployment (chain ID 61999), fresh two-wallet lifecycle, browser-wallet E2E, production hosting, and GitHub Actions: not performed. There are no wallet/provider/hosting credentials available in the process environment.
+- The current SDK fixes and test additions are still uncommitted/unpushed; CI has not yet run on them.
+- Full GenVM SDK validation/schema verification remains unresolved.
+- No final contract has been deployed. `deployments/studionet.json` remains pre-deployment.
+- No fresh two-wallet Studionet lifecycle, transaction hashes, browser-wallet E2E, or final explorer readbacks exist.
+- No frontend production deployment exists; no final contract address is configured.
+- GitHub Actions status for the final source is not yet available.
 
-The deployment manifest remains `pre-deployment` and `docs/LIVE_EVIDENCE.md` remains an explicit not-run placeholder. No address, transaction hash, test result, or production URL has been fabricated.
+No address, transaction hash, deployment URL, or live PASS has been fabricated. The live evidence file remains a not-run placeholder.

@@ -1,6 +1,6 @@
 import { createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
-import { TransactionHashVariant } from 'genlayer-js/types';
+import { ExecutionResult, TransactionHash, TransactionHashVariant, TransactionStatus } from 'genlayer-js/types';
 
 type Provider = NonNullable<Window['ethereum']>;
 
@@ -45,21 +45,21 @@ export async function readFinalized<T = unknown>(functionName: string, args: unk
 
 export async function writeFinalized(expectedAccount: string, functionName: string, args: unknown[]) {
   if (!configured) throw new Error('Contract address is not configured.');
-  const { account, client } = await connectedClient(expectedAccount);
-  const call = {
+  const { client } = await connectedClient(expectedAccount);
+  const hash = await client.writeContract({
     address: CONTRACT as `0x${string}`,
     functionName,
     args,
     value: 0n,
-  };
-  const estimate = await client.estimateTransactionFeesForWrite(call as never);
-  const hash = await client.writeContract({
-    ...call,
-    account: account as `0x${string}`,
-    fees: { distribution: estimate.distribution, feeValue: estimate.feeValue },
   } as never) as string;
   if (!/^0x[a-fA-F0-9]{64}$/.test(hash)) throw new Error('Wallet returned an invalid transaction hash.');
-  await client.waitForFinalization({ hash: hash as `0x${string}` });
+  const receipt = await client.waitForTransactionReceipt({
+    hash: hash as TransactionHash,
+    status: TransactionStatus.FINALIZED,
+  });
+  if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
+    throw new Error(`Transaction finalized with ${receipt.txExecutionResultName || 'no execution result'}.`);
+  }
   return hash;
 }
 
