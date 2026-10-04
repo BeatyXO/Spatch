@@ -676,9 +676,11 @@ class Spatch(gl.Contract):
                     return canon({"kind": UNRESOLVED, "reason": "MODEL_COMPONENT_BINDING_INVALID"})
                 for expected, row in zip(candidates, rows):
                     if set(row) != {"component_id", "component_revision", "version_revision", "verdict", "reason_code", "fixed_version"}:
-                        return canon({"kind": UNRESOLVED, "reason": "MODEL_SCHEMA_INVALID"})
-                    if row["component_revision"] != expected["component_revision"] or row["version_revision"] != expected["version_revision"] or row["verdict"] not in allowed_v or row["reason_code"] not in allowed_r:
-                        return canon({"kind": UNRESOLVED, "reason": "MODEL_SCHEMA_INVALID"})
+                        return canon({"kind": UNRESOLVED, "reason": "MODEL_ROW_SCHEMA_INVALID"})
+                    if row["component_id"] != expected["component_id"] or row["component_revision"] != expected["component_revision"] or row["version_revision"] != expected["version_revision"]:
+                        return canon({"kind": UNRESOLVED, "reason": "MODEL_REVISION_BINDING_INVALID"})
+                    if row["verdict"] not in allowed_v or row["reason_code"] not in allowed_r or not isinstance(row["fixed_version"], str):
+                        return canon({"kind": UNRESOLVED, "reason": "MODEL_ENUM_INVALID"})
                     if row["verdict"] == AFFECTED and row["reason_code"] != "VERSION_IN_AFFECTED_RANGE":
                         return canon({"kind": UNRESOLVED, "reason": "MODEL_CONTRADICTION"})
                     if row["verdict"] == NOT_AFFECTED and row["reason_code"] not in ("VERSION_OUTSIDE_AFFECTED_RANGE", "PACKAGE_NOT_TARGETED"):
