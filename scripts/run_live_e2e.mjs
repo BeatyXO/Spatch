@@ -124,6 +124,7 @@ const vulnerableResult = vulnerableAssessment.results?.find(
 );
 assert(
   vulnerableAssessment.advisory_id === process.env.SPATCH_GHSA && vulnerableResult &&
+    vulnerableResult.verdict === 'AFFECTED' &&
     Number(vulnerableResult.version_revision) === Number(dep.version_revision),
   'assessment bound to vulnerable version revision',
   vulnerableAssessment,
@@ -141,6 +142,18 @@ assert(
     Number(dep.last_assessment_id) === stateBeforeReplay.lastAssessment,
   'replay leaves vulnerable state unchanged',
   dep,
+);
+
+const appBeforeBlockedRecovery = app;
+await write(observerClient, observer, 'blocked_downstream_recovery', 'reassess_dependency', [
+  appId,
+  Number(app.revision),
+]);
+app = await read('get_component', [appId]);
+assert(
+  app.status === 'RECHECK_REQUIRED' && Number(app.revision) === Number(appBeforeBlockedRecovery.revision),
+  'recovery blocked while upstream vulnerable',
+  app,
 );
 
 await write(authorClient, author, 'stage_patch', 'patch_component', [dependencyId, process.env.SPATCH_FIXED_VERSION, Number(dep.revision)]);
@@ -165,6 +178,8 @@ const patchedResult = patchedAssessment.results?.find(
 );
 assert(
   patchedAssessment.advisory_id === process.env.SPATCH_GHSA && patchedResult &&
+    patchedResult.verdict === 'NOT_AFFECTED' &&
+    patchedResult.reason_code === 'VERSION_OUTSIDE_AFFECTED_RANGE' &&
     Number(patchedResult.version_revision) === Number(dep.version_revision) &&
     Number(dep.version_revision) === Number(vulnerableResult.version_revision) + 1,
   'same GHSA reassessed only for new version revision',
@@ -179,8 +194,13 @@ assert(app.status === 'ACTIVE', 'downstream recovery', app);
 project = await read('get_project', [projectId]);
 counts = await read('get_counts');
 assert(Number(counts.projects) === 1 && Number(counts.components) === 2 && Number(counts.edges) === 1, 'final graph counts', counts);
+const edge = await read('get_edge', [1]);
+const assessments = [];
+for (let id = 1; id <= Number(counts.assessments); id++) assessments.push(await read('get_assessment', [id]));
 console.log(`e2e.final.project=${JSON.stringify(project)}`);
 console.log(`e2e.final.dependency=${JSON.stringify(dep)}`);
 console.log(`e2e.final.app=${JSON.stringify(app)}`);
+console.log(`e2e.final.edge=${JSON.stringify(edge)}`);
 console.log(`e2e.final.counts=${JSON.stringify(counts)}`);
+console.log(`e2e.final.assessments=${JSON.stringify(assessments)}`);
 console.log('e2e.result=PASS');
