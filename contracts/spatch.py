@@ -660,9 +660,11 @@ class Spatch(gl.Contract):
                 )
                 raw = gl.nondet.exec_prompt(prompt, response_format="json")
                 result = raw if isinstance(raw, dict) else json.loads(str(raw))
-                rows = result.get("results") if type(result) is dict and set(result) == {"results"} else None
+                if type(result) is not dict or set(result) != {"results"}:
+                    return canon({"kind": UNRESOLVED, "reason": "MODEL_TOP_LEVEL_SCHEMA_INVALID"})
+                rows = result.get("results")
                 if type(rows) is not list or len(rows) != len(candidates):
-                    return canon({"kind": UNRESOLVED, "reason": "MODEL_SCHEMA_INVALID"})
+                    return canon({"kind": UNRESOLVED, "reason": "MODEL_RESULT_COUNT_INVALID"})
                 allowed_v = (AFFECTED, NOT_AFFECTED, UNRESOLVED)
                 allowed_r = (
                     "VERSION_IN_AFFECTED_RANGE",
@@ -673,7 +675,7 @@ class Spatch(gl.Contract):
                 )
                 expected_ids = [row["component_id"] for row in candidates]
                 if [row.get("component_id") for row in rows] != expected_ids:
-                    return canon({"kind": UNRESOLVED, "reason": "MODEL_COMPONENT_BINDING_INVALID"})
+                    return canon({"kind": UNRESOLVED, "reason": "MODEL_COMPONENT_ORDER_INVALID"})
                 for expected, row in zip(candidates, rows):
                     if set(row) != {"component_id", "component_revision", "version_revision", "verdict", "reason_code", "fixed_version"}:
                         return canon({"kind": UNRESOLVED, "reason": "MODEL_ROW_SCHEMA_INVALID"})

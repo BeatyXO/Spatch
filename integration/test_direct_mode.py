@@ -199,7 +199,7 @@ def test_direct_malformed_model_output_fails_closed(direct_deploy, direct_vm, di
     assessment_id = int(contract.assess_advisory(project_id, GHSA))
     assessment = contract.get_assessment(assessment_id)
     assert assessment["status"] == "UNRESOLVED"
-    assert assessment["reason"] == "MODEL_SCHEMA_INVALID", assessment
+    assert assessment["reason"] == "MODEL_TOP_LEVEL_SCHEMA_INVALID", assessment
     assert contract.get_component(dep_id)["status"] == "UNRESOLVED"
     assert contract.get_findings(dep_id)["current"][0]["verdict"] == "UNRESOLVED"
     assert contract.verify_component(dep_id, contract.get_component(dep_id)["revision"]) == "COMPONENT_IDENTITY_ALREADY_CURRENT"
