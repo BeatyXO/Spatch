@@ -1,0 +1,9 @@
+{
+  "network": "GenLayer Studionet",
+  "chainId": 61999,
+  "contractAddress": "",
+  "sourceFile": "contracts/spatch.py",
+  "status": "pre-deployment",
+  "protocolVersion": 1,
+  "frontend": ""
+}
