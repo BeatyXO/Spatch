@@ -21,5 +21,10 @@ describe('presentation helpers', () => {
     expect(() => assertSuccessfulWrite('assess_advisory', 'ADVISORY_ALREADY_ASSESSED_FOR_CURRENT_REVISIONS')).toThrow();
     expect(() => assertSuccessfulWrite('seal_project', 'SEALED')).not.toThrow();
     expect(() => assertSuccessfulWrite('verify_patch', '7')).not.toThrow();
+    expect(() => assertSuccessfulWrite('create_project', 0)).toThrow(/without changing state/);
+    expect(() => assertSuccessfulWrite('create_project', undefined)).toThrow(/could not be verified/);
+    expect(() => assertSuccessfulWrite('create_project', { status: 'return', payload: { readable: '1' } })).not.toThrow();
+    expect(() => assertSuccessfulWrite('seal_project', { status: 'return', payload: { readable: '"SEALED"' } })).not.toThrow();
+    expect(() => assertSuccessfulWrite('add_component', { status: 'return', payload: { readable: '"ONLY_PROJECT_CREATOR"' } })).toThrow(/ONLY_PROJECT_CREATOR/);
   });
 });

@@ -18,7 +18,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Component, Counts, Edge, parsePositiveInt, Project, statusLabel, statusTone } from './actions';
-import { CHAIN_ID, CONTRACT, configured, connectWallet, disconnectWallet, explorerAddress, readFinalized, short, switchToStudionet, txUrl, walletState, writeFinalized } from './genlayer';
+import { CHAIN_ID, CONTRACT, FinalizedWriteError, configured, connectWallet, disconnectWallet, explorerAddress, readFinalized, short, switchToStudionet, txUrl, walletState, writeFinalized } from './genlayer';
 
 const emptyCounts: Counts = { projects: 0, components: 0, edges: 0, assessments: 0 };
 
@@ -117,6 +117,7 @@ export default function App() {
       after?.();
       await loadProject(selectedProjectId || 1);
     } catch (error) {
+      if (error instanceof FinalizedWriteError) setLastTx(error.txHash);
       setNotice(error instanceof Error ? error.message : String(error));
     } finally { setBusy(''); }
   }

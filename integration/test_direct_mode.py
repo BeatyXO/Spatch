@@ -108,6 +108,9 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
     ]})
     assert direct_vm.run_validator(leader_result=fixed_conflict) is False
     assert contract.get_component(dep_id)["status"] == "VULNERABLE"
+    dep = contract.get_component(dep_id)
+    assert contract.verify_component(dep_id, dep["revision"]) == "COMPONENT_IDENTITY_ALREADY_CURRENT"
+    assert contract.get_component(dep_id)["status"] == "VULNERABLE"
     assert contract.get_component(app_id)["status"] == "RECHECK_REQUIRED"
     app = contract.get_component(app_id)
     assert contract.verify_component(app_id, app["revision"]) == "COMPONENT_IDENTITY_ALREADY_CURRENT"
@@ -127,6 +130,10 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
     assert staged["history"][-1]["status"] == "VULNERABLE"
     assert staged["identity_evidence_digest"] == ""
     assert staged["status"] == "PATCH_PENDING"
+    app = contract.get_component(app_id)
+    app_revision = app["revision"]
+    assert contract.reassess_dependency(app_id, app_revision) == "UPSTREAM_NOT_STABLE"
+    assert contract.get_component(app_id)["revision"] == app_revision
 
     identity(direct_vm, "jinja2", "3.1.5")
     direct_vm.sender = direct_bob
@@ -136,6 +143,8 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
     assert patched["status"] == "SECURITY_REASSESS_REQUIRED"
     assert patched["security_status"] == "SECURITY_REASSESS_REQUIRED"
     assert contract.get_findings(dep_id)["pending_advisories"] == [GHSA]
+    assert contract.reassess_dependency(app_id, app_revision) == "UPSTREAM_NOT_STABLE"
+    assert contract.get_component(app_id)["revision"] == app_revision
 
     direct_vm.clear_mocks()
     advisory_sources(direct_vm)

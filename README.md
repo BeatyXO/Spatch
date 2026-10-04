@@ -57,19 +57,20 @@ See [architecture](docs/ARCHITECTURE.md), [threat model](docs/THREAT_MODEL.md), 
 ## Local checks
 
 ```bash
+python -m pip install -r requirements-dev.txt
 python -m pytest tests -q
-# 19 lightweight tests pass
-
-pip install genvm-linter
 genvm-lint check contracts/spatch.py
+python scripts/prepare_direct_mode_sdk.py
+gltest integration/test_direct_mode.py -q
 
 cd frontend
 npm ci
 npm test
 npm run build
+npm audit
 ```
 
-The official GenLayer Direct Mode suite, frontend checks, and GenVM checks run in [GitHub Actions](https://github.com/BeatyXO/Spatch/actions). Current counts and platform-specific limitations are in [verification status](docs/VERIFICATION.md).
+The official GenLayer Direct Mode suite, frontend checks, dependency audit, and GenVM checks run in [GitHub Actions](https://github.com/BeatyXO/Spatch/actions). Current counts and platform-specific limitations are in [verification status](docs/VERIFICATION.md).
 
 ## Frontend direction
 

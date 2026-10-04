@@ -1,8 +1,10 @@
 __pycache__/
 .pytest_cache/
 .venv/
+artifacts/
 node_modules/
 dist/
+.vercel/
 .env
 .env.local
 .env.production

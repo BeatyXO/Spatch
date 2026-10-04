@@ -5,7 +5,7 @@
   "explorerUrl": "https://explorer-studio.genlayer.com/address/0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39",
   "deploymentTransaction": "0x6704d8c446543fa1b2d635ae113ebb4f1de5cd5ca2f1a400fbac4232c158c380",
   "sourceFile": "contracts/spatch.py",
-  "sourceSha256": "e34674bad43e7dd646a16bcb3a9540f3e1c803b7e1eba5c7f47bd96731b0eb4d",
+  "sourceSha256": "a22c549fd0df48a312b93890d24f7cc3c8d2eb9e9d6140f146597156e12ac151",
   "sourceGitBlob": "24ded26de8861205c6b51659f85a7516878c92fe",
   "sourceCommit": "a64b1fee698aa9112b150d28921552825a5cc30e",
   "status": "deployed-verified-live-lifecycle-passed",

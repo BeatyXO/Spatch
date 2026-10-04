@@ -8,10 +8,10 @@
 
 - Contract: [`0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`](https://explorer-studio.genlayer.com/address/0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39)
 - Deployment transaction: [`0x6704d8c446543fa1b2d635ae113ebb4f1de5cd5ca2f1a400fbac4232c158c380`](https://explorer-studio.genlayer.com/tx/0x6704d8c446543fa1b2d635ae113ebb4f1de5cd5ca2f1a400fbac4232c158c380)
-- Source SHA-256 (newline-normalized): `e34674bad43e7dd646a16bcb3a9540f3e1c803b7e1eba5c7f47bd96731b0eb4d`
+- Source SHA-256 (newline-normalized UTF-8): `a22c549fd0df48a312b93890d24f7cc3c8d2eb9e9d6140f146597156e12ac151`
 - Git blob: `24ded26de8861205c6b51659f85a7516878c92fe`
 - Source commit: `a64b1fee698aa9112b150d28921552825a5cc30e`
-- `genlayer-js.getContractCode` returned source whose newline-normalized SHA-256 exactly matches `contracts/spatch.py`. `genlayer schema` exposed all 9 public writes plus `get_findings` and `get_security_findings`. Finalized `get_protocol` reported version 2 and chain ID 61999. Initial counts were zero.
+- A fresh `genlayer-js.getContractCode` read against finalized Studionet returned source that byte-for-byte matches `contracts/spatch.py` after CRLF→LF normalization; both SHA-256 digests are `a22c549fd0df48a312b93890d24f7cc3c8d2eb9e9d6140f146597156e12ac151`. `genlayer schema` exposed all 9 public writes plus `get_findings` and `get_security_findings`. Finalized `get_protocol` reported version 2 and chain ID 61999. Initial counts were zero.
 
 ### Wallet roles
 

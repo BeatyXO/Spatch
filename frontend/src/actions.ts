@@ -65,9 +65,28 @@ export function parsePositiveInt(value: string, label: string) {
   return n;
 }
 
-export function assertSuccessfulWrite(functionName: string, result: unknown) {
-  if (typeof result !== 'string' || /^\d+$/.test(result)) return;
+export function decodeContractReturn(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value;
+  const result = value as { status?: unknown; payload?: { readable?: unknown } };
+  if (result.status !== 'return' || typeof result.payload?.readable !== 'string') return value;
+  try { return JSON.parse(result.payload.readable); }
+  catch { return result.payload.readable; }
+}
+
+export function assertSuccessfulWrite(functionName: string, rawResult: unknown) {
+  const result = decodeContractReturn(rawResult);
+  const isPositiveInteger = (value: unknown) => {
+    if (typeof value === 'number') return Number.isSafeInteger(value) && value > 0;
+    if (typeof value === 'bigint') return value > 0n;
+    if (typeof value !== 'string' || !/^\d+$/.test(value)) return false;
+    try { return BigInt(value) > 0n; }
+    catch { return false; }
+  };
+  if (isPositiveInteger(result)) return;
   const expected = functionName === 'seal_project' ? 'SEALED' : functionName === 'patch_component' ? 'PATCH_VERSION_STAGED' : '';
   if (expected && result === expected) return;
+  if (result === undefined || result === null) {
+    throw new Error(`${functionName} finalized, but the contract return value could not be verified.`);
+  }
   throw new Error(`${functionName} finalized without changing state: ${result}.`);
 }

@@ -23,6 +23,13 @@ export const reader = createClient({ chain: studionet });
 export const explorerAddress = configured ? `https://explorer-studio.genlayer.com/address/${CONTRACT}` : '';
 export const txUrl = (hash: string) => `https://explorer-studio.genlayer.com/tx/${hash}`;
 
+export class FinalizedWriteError extends Error {
+  constructor(message: string, readonly txHash: string) {
+    super(message);
+    this.name = 'FinalizedWriteError';
+  }
+}
+
 export async function connectWallet(provider: Provider | undefined = window.ethereum) {
   if (!provider?.request) throw new Error('Install or enable an injected wallet such as Rabby or MetaMask.');
   const accounts = await provider.request({ method: 'eth_requestAccounts' }) as string[];
@@ -103,12 +110,19 @@ export async function writeFinalized(expectedAccount: string, functionName: stri
     hash: hash as TransactionHash,
     status: TransactionStatus.FINALIZED,
   } as never) as Awaited<ReturnType<typeof client.waitForTransactionReceipt>> & {
-    consensus_data?: { leader_receipt?: Array<{ result?: unknown }> };
+    consensus_data?: { leader_receipt?: Array<{ mode?: string; result?: unknown }> };
   };
   if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
-    throw new Error(`Transaction finalized with ${receipt.txExecutionResultName || 'no execution result'}.`);
+    throw new FinalizedWriteError(`Transaction finalized with ${receipt.txExecutionResultName || 'no execution result'}.`, hash);
   }
-  assertSuccessfulWrite(functionName, receipt.consensus_data?.leader_receipt?.[0]?.result);
+  const leaderReceipt = receipt.consensus_data?.leader_receipt?.find((entry) => entry.mode === 'leader');
+  if (!leaderReceipt) {
+    throw new FinalizedWriteError('Transaction finalized, but its leader return value is missing; verify finalized contract state before assuming success.', hash);
+  }
+  try { assertSuccessfulWrite(functionName, leaderReceipt.result); }
+  catch (error) {
+    throw new FinalizedWriteError(error instanceof Error ? error.message : String(error), hash);
+  }
   return hash;
 }
 
