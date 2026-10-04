@@ -146,7 +146,12 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
     ]))
     next_assessment = int(contract.assess_advisory(project_id, GHSA))
     assert next_assessment > assessment_id
-    assert contract.get_component(dep_id)["status"] == "ACTIVE", (contract.get_assessment(next_assessment), contract.get_findings(dep_id), contract.get_component(dep_id))
+    next_record = contract.get_assessment(next_assessment)
+    assert contract.get_component(dep_id)["status"] == "ACTIVE", {
+        "assessment": {key: next_record.get(key) for key in ("status", "reason", "diagnostic", "results")},
+        "findings": contract.get_findings(dep_id),
+        "component": contract.get_component(dep_id),
+    }
     assert contract.get_findings(dep_id)["pending_advisories"] == []
     app = contract.get_component(app_id)
     assert int(contract.reassess_dependency(app_id, app["revision"])) > next_assessment
