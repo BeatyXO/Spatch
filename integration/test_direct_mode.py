@@ -74,7 +74,7 @@ def verified_sealed(contract, vm, project_id, dep_id, app_id, observer):
 
 
 def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deploy, direct_vm, direct_alice, direct_bob):
-    contract = direct_deploy("contracts/spatch.py")
+    contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
     project_id, dep_id, app_id = draft(contract, direct_vm, direct_alice)
     assert contract.seal_project(project_id) == "COMPONENT_IDENTITY_NOT_CURRENT"
     verified_sealed(contract, direct_vm, project_id, dep_id, app_id, direct_bob)
@@ -132,7 +132,7 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
 
 
 def test_direct_creator_only_order_bounds_and_validation(direct_deploy, direct_vm, direct_alice, direct_bob):
-    contract = direct_deploy("contracts/spatch.py")
+    contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
     direct_vm.sender = direct_alice
     project_id = int(contract.create_project("Bounded graph validation"))
     direct_vm.sender = direct_bob
@@ -150,7 +150,7 @@ def test_direct_creator_only_order_bounds_and_validation(direct_deploy, direct_v
 
 
 def test_direct_identity_source_failure_and_stale_revision_fail_closed(direct_deploy, direct_vm, direct_alice, direct_bob):
-    contract = direct_deploy("contracts/spatch.py")
+    contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
     project_id, dep_id, app_id = draft(contract, direct_vm, direct_alice)
     direct_vm.sender = direct_bob
     dep = contract.get_component(dep_id)
@@ -162,7 +162,7 @@ def test_direct_identity_source_failure_and_stale_revision_fail_closed(direct_de
 
 
 def test_direct_malformed_model_output_fails_closed(direct_deploy, direct_vm, direct_alice, direct_bob):
-    contract = direct_deploy("contracts/spatch.py")
+    contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
     project_id, dep_id, app_id = draft(contract, direct_vm, direct_alice)
     verified_sealed(contract, direct_vm, project_id, dep_id, app_id, direct_bob)
     advisory_sources(direct_vm)
@@ -176,7 +176,7 @@ def test_direct_malformed_model_output_fails_closed(direct_deploy, direct_vm, di
 
 
 def test_direct_component_and_edge_bounds(direct_deploy, direct_vm, direct_alice):
-    contract = direct_deploy("contracts/spatch.py")
+    contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
     direct_vm.sender = direct_alice
     project_id = int(contract.create_project("Graph bound checks"))
     component_ids = [int(contract.add_component(project_id, "pypi", f"pkg-{i}", "1.0.0")) for i in range(16)]

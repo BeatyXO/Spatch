@@ -15,8 +15,9 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements-dev.txt genvm-linter
       - run: python -m pytest tests -q
-      - run: gltest integration/test_direct_mode.py -q
       - run: genvm-lint check contracts/spatch.py
+      - run: python scripts/prepare_direct_mode_sdk.py
+      - run: gltest integration/test_direct_mode.py -q
 
   frontend:
     runs-on: ubuntu-latest
