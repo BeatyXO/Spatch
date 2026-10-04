@@ -10,6 +10,6 @@
   "sourceCommit": "a64b1fee698aa9112b150d28921552825a5cc30e",
   "status": "deployed-verified-live-lifecycle-passed",
   "protocolVersion": 2,
-  "frontend": "https://spatch-rosy.vercel.app",
+  "frontend": "https://spatch-six.vercel.app",
   "historicalEvidence": "docs/HISTORICAL_EVIDENCE.md"
 }

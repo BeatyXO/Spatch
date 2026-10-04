@@ -7,12 +7,12 @@ Status after the advisory-scoped security-state refactor and fresh Studionet dep
 - Lightweight contract/architecture suite: `python -m pytest tests -q` — **19 passed** locally.
 - Official GenLayer Direct Mode suite (`genlayer-test==0.29.2`) — **10 passed** on Linux CI.
 - GenVM lint — **3 checks passed**; GenVM SDK/schema validation passed on Linux CI.
-- Frontend � `npm test` **6 passed**; `npm run build` passed. `npm audit` reports **0 vulnerabilities** after updating Vitest to 4.1.11.
+- Frontend — `npm test` **6 passed**; `npm run build` passed. `npm audit` reports **0 vulnerabilities** after updating Vitest to 4.1.11.
 - GenLayer SDK receipt inspection confirmed writes return JSON data in `leader_receipt[].result.payload.readable`. The frontend now decodes the leader return and treats known contract errors, missing results, and zero IDs as failures while retaining the finalized transaction link.
 - GitHub Actions validates the submitted `main` commit with Python tests, GenVM lint and validation, Direct Mode, frontend tests, and build: [Actions runs](https://github.com/BeatyXO/Spatch/actions).
-- Fresh Studionet deployment (chain 61999) � finalized; live `getContractCode` readback matches the tracked source after newline normalization. Source digest and deployment identity are in `deployments/studionet.json`.
-- Fresh two-wallet lifecycle � **PASS**. All listed writes were finalized and read back, including unauthorized/stale no-ops, identity, seal, vulnerable finding, replay protection, blocked recovery, patch/history/proof clearing, same-GHSA new-version reassessment, identity-vs-recheck proof, and downstream recovery. See `docs/LIVE_EVIDENCE.md`.
-- The production frontend [https://spatch-rosy.vercel.app](https://spatch-rosy.vercel.app) returned HTTP 200. It rendered Project 1 from finalized reads with the canonical Studionet explorer address. Responsive checks at 1440px, 900px, and 390px showed no horizontal overflow.
+- Fresh Studionet deployment (chain 61999) — finalized; live `getContractCode` readback matches the tracked source after newline normalization. Source digest and deployment identity are in `deployments/studionet.json`.
+- Fresh two-wallet lifecycle — **PASS**. All listed writes were finalized and read back, including unauthorized/stale no-ops, identity, seal, vulnerable finding, replay protection, blocked recovery, patch/history/proof clearing, same-GHSA new-version reassessment, identity-vs-recheck proof, and downstream recovery. See `docs/LIVE_EVIDENCE.md`.
+- The production frontend [https://spatch-six.vercel.app](https://spatch-six.vercel.app) returned HTTP 200. It rendered Project 1 from finalized reads with the canonical Studionet explorer address. Responsive checks at 1440px, 900px, and 390px showed no horizontal overflow. This is a single-screen client app; non-root deep links are not implemented and return 404.
 - Production JavaScript was checked for the canonical contract address and the wallet menu / Studionet switch UI. Chrome had no usable `window.ethereum` provider, so injected-wallet E2E remains unverified.
 
 ## Final live counts

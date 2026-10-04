@@ -51,7 +51,7 @@ See [architecture](docs/ARCHITECTURE.md), [threat model](docs/THREAT_MODEL.md), 
 - Canonical contract: [`0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`](https://explorer-studio.genlayer.com/address/0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39).
 - Deployment transaction: [`0x6704d8c446543fa1b2d635ae113ebb4f1de5cd5ca2f1a400fbac4232c158c380`](https://explorer-studio.genlayer.com/tx/0x6704d8c446543fa1b2d635ae113ebb4f1de5cd5ca2f1a400fbac4232c158c380).
 - Source/schema verification and the fresh two-wallet lifecycle are recorded in [live evidence](docs/LIVE_EVIDENCE.md).
-- Production frontend: [spatch-rosy.vercel.app](https://spatch-rosy.vercel.app), deployed from the GitHub `main` branch. The live bundle was verified to reference the canonical contract above; its build variable is `VITE_CONTRACT_ADDRESS=0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`.
+- Production frontend: [spatch-six.vercel.app](https://spatch-six.vercel.app), deployed from the GitHub `main` branch. The live bundle was verified to reference the canonical contract above; its build variable is `VITE_CONTRACT_ADDRESS=0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`.
 - Superseded deployment evidence is retained only for auditability in [historical evidence](docs/HISTORICAL_EVIDENCE.md).
 
 ## Local checks
