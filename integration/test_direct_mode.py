@@ -88,6 +88,8 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
         row(dep_id, dep["revision"], dep["version_revision"], "AFFECTED", "VERSION_IN_AFFECTED_RANGE", "3.1.5"),
         row(app_id, app["revision"], app["version_revision"], "NOT_AFFECTED", "PACKAGE_NOT_TARGETED"),
     ]
+    direct_vm.clear_mocks()
+    direct_vm.clear_mocks()
     advisory_sources(direct_vm)
     direct_vm.mock_llm(".*", judgment(rows))
     direct_vm.sender = direct_bob
@@ -135,6 +137,7 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
     assert patched["security_status"] == "SECURITY_REASSESS_REQUIRED"
     assert contract.get_findings(dep_id)["pending_advisories"] == [GHSA]
 
+    direct_vm.clear_mocks()
     advisory_sources(direct_vm)
     app = contract.get_component(app_id)
     direct_vm.mock_llm(".*", judgment([
@@ -143,7 +146,7 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
     ]))
     next_assessment = int(contract.assess_advisory(project_id, GHSA))
     assert next_assessment > assessment_id
-    assert contract.get_component(dep_id)["status"] == "ACTIVE"
+    assert contract.get_component(dep_id)["status"] == "ACTIVE", (contract.get_assessment(next_assessment), contract.get_findings(dep_id), contract.get_component(dep_id))
     assert contract.get_findings(dep_id)["pending_advisories"] == []
     app = contract.get_component(app_id)
     assert int(contract.reassess_dependency(app_id, app["revision"])) > next_assessment
