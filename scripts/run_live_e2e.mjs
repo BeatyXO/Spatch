@@ -45,7 +45,12 @@ const read = (name, args = []) => reader.readContract({
 async function write(client, account, label, name, args) {
   const hash = await client.writeContract({ address: contractAddress, functionName: name, args, value: 0n });
   console.log(`${label}.submitted=${hash}`);
-  const receipt = await client.waitForTransactionReceipt({ hash, status: TransactionStatus.FINALIZED });
+  const receipt = await client.waitForTransactionReceipt({
+    hash,
+    status: TransactionStatus.FINALIZED,
+    interval: 3000,
+    retries: 240,
+  });
   if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
     throw new Error(`${label} finalized with ${receipt.txExecutionResultName || 'no execution result'}`);
   }

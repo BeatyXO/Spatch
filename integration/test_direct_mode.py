@@ -178,6 +178,36 @@ def test_direct_malformed_model_output_fails_closed(direct_deploy, direct_vm, di
     assert contract.get_component(dep_id)["status"] == "ACTIVE"
 
 
+@pytest.mark.parametrize("source_response", [
+    {"method": "GET", "status": 503, "body": "offline"},
+    {"method": "GET", "status": 200, "body": "{"},
+], ids=["osv-outage", "malformed-osv-json"])
+def test_direct_advisory_source_failures_fail_closed(
+    direct_deploy, direct_vm, direct_alice, direct_bob, source_response,
+):
+    contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
+    project_id, dep_id, app_id = draft(contract, direct_vm, direct_alice)
+    verified_sealed(contract, direct_vm, project_id, dep_id, app_id, direct_bob)
+    direct_vm.mock_web(rf"api\.osv\.dev/v1/vulns/{GHSA}", source_response)
+    web_json(direct_vm, rf"api\.github\.com/advisories/{GHSA}", {
+        "ghsa_id": GHSA,
+        "summary": "Jinja sandbox breakout through malicious filenames",
+        "description": "Jinja2 releases through 3.1.4 are affected.",
+        "vulnerabilities": [{
+            "package": {"ecosystem": "pip", "name": "jinja2"},
+            "vulnerable_version_range": ">= 3.0.0, <= 3.1.4",
+            "first_patched_version": {"identifier": "3.1.5"},
+        }],
+    })
+    direct_vm.sender = direct_bob
+    assessment_id = int(contract.assess_advisory(project_id, GHSA))
+    assessment = contract.get_assessment(assessment_id)
+    assert assessment["status"] == "UNRESOLVED"
+    assert assessment["reason"] == "ADVISORY_SOURCE_UNAVAILABLE"
+    assert contract.get_component(dep_id)["status"] == "ACTIVE"
+    assert contract.get_component(app_id)["status"] == "ACTIVE"
+
+
 def test_direct_component_and_edge_bounds(direct_deploy, direct_vm, direct_alice):
     contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
     direct_vm.sender = direct_alice
@@ -194,3 +224,22 @@ def test_direct_component_and_edge_bounds(direct_deploy, direct_vm, direct_alice
                 assert contract.add_dependency(component_ids[-1], component_ids[-2]) == "EDGE_LIMIT"
                 return
     raise AssertionError("The test graph did not reach MAX_EDGES")
+
+
+def test_direct_history_bound_rejects_patch_without_mutation(
+    direct_deploy, direct_vm, direct_alice, direct_bob,
+):
+    contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
+    project_id, dep_id, app_id = draft(contract, direct_vm, direct_alice)
+    verified_sealed(contract, direct_vm, project_id, dep_id, app_id, direct_bob)
+    component = contract.get_component(dep_id)
+    component["status"] = "VULNERABLE"
+    component["history"] = [
+        {"version": f"0.0.{index}", "status": "VULNERABLE"}
+        for index in range(8)
+    ]
+    contract._save_component(component)
+    direct_vm.sender = direct_alice
+    before = contract.get_component(dep_id)
+    assert contract.patch_component(dep_id, "3.1.5", before["revision"]) == "VERSION_HISTORY_LIMIT"
+    assert contract.get_component(dep_id) == before
