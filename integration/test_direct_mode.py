@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-GHSA = "GHSA-2g3v-6x4w-9r2p"
+GHSA = "GHSA-gmj6-6f8f-6699"
 
 
 def web_json(vm, pattern, value, status=200):
@@ -22,17 +22,17 @@ def advisory_sources(vm):
         "id": GHSA,
         "affected": [{
             "package": {"ecosystem": "PyPI", "name": "jinja2"},
-            "ranges": [{"type": "ECOSYSTEM", "events": [{"introduced": "0"}, {"fixed": "3.1.6"}]}],
+            "ranges": [{"type": "ECOSYSTEM", "events": [{"introduced": "3.0.0"}, {"fixed": "3.1.5"}]}],
         }],
     })
     web_json(vm, rf"api\.github\.com/advisories/{GHSA}", {
         "ghsa_id": GHSA,
-        "summary": "Jinja template rendering issue",
-        "description": "Jinja2 releases before 3.1.6 are affected.",
+        "summary": "Jinja sandbox breakout through malicious filenames",
+        "description": "Jinja2 releases through 3.1.4 are affected.",
         "vulnerabilities": [{
             "package": {"ecosystem": "pip", "name": "jinja2"},
-            "vulnerable_version_range": "< 3.1.6",
-            "first_patched_version": {"identifier": "3.1.6"},
+            "vulnerable_version_range": ">= 3.0.0, <= 3.1.4",
+            "first_patched_version": {"identifier": "3.1.5"},
         }],
     })
 
@@ -82,7 +82,7 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
     dep = contract.get_component(dep_id)
     app = contract.get_component(app_id)
     rows = [
-        row(dep_id, dep["revision"], dep["version_revision"], "AFFECTED", "VERSION_IN_AFFECTED_RANGE", "3.1.6"),
+        row(dep_id, dep["revision"], dep["version_revision"], "AFFECTED", "VERSION_IN_AFFECTED_RANGE", "3.1.5"),
         row(app_id, app["revision"], app["version_revision"], "NOT_AFFECTED", "PACKAGE_NOT_TARGETED"),
     ]
     advisory_sources(direct_vm)
@@ -105,14 +105,14 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
     assert contract.reassess_dependency(app_id, app["revision"]) == "UPSTREAM_STILL_VULNERABLE"
     dep = contract.get_component(dep_id)
     direct_vm.sender = direct_alice
-    assert contract.patch_component(dep_id, "3.1.6", dep["revision"]) == "PATCH_VERSION_STAGED"
+    assert contract.patch_component(dep_id, "3.1.5", dep["revision"]) == "PATCH_VERSION_STAGED"
     staged = contract.get_component(dep_id)
     assert staged["history"][-1]["version"] == "3.1.4"
     assert staged["history"][-1]["status"] == "VULNERABLE"
     assert staged["identity_evidence_digest"] == ""
     assert staged["status"] == "PATCH_PENDING"
 
-    identity(direct_vm, "jinja2", "3.1.6")
+    identity(direct_vm, "jinja2", "3.1.5")
     direct_vm.sender = direct_bob
     assert int(contract.verify_patch(dep_id, staged["revision"])) > 0
     patched = contract.get_component(dep_id)
@@ -121,7 +121,7 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
 
     advisory_sources(direct_vm)
     direct_vm.mock_llm(".*", judgment([
-        row(dep_id, patched["revision"], patched["version_revision"], "NOT_AFFECTED", "VERSION_OUTSIDE_AFFECTED_RANGE", "3.1.6"),
+        row(dep_id, patched["revision"], patched["version_revision"], "NOT_AFFECTED", "VERSION_OUTSIDE_AFFECTED_RANGE", "3.1.5"),
     ]))
     next_assessment = int(contract.assess_advisory(project_id, GHSA))
     assert next_assessment > assessment_id
@@ -158,6 +158,7 @@ def test_direct_identity_source_failure_and_stale_revision_fail_closed(direct_de
     direct_vm.mock_web(r"api\.deps\.dev", {"method": "GET", "status": 503, "body": "offline"})
     assert int(contract.verify_component(dep_id, dep["revision"])) > 0
     assert contract.get_component(dep_id)["status"] == "UNRESOLVED"
+    direct_vm.sender = direct_alice
     assert contract.seal_project(project_id) == "COMPONENT_IDENTITY_NOT_CURRENT"
 
 
