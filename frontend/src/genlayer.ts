@@ -2,7 +2,10 @@ import { createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
 import { ExecutionResult, TransactionHash, TransactionHashVariant, TransactionStatus } from 'genlayer-js/types';
 
-type Provider = NonNullable<Window['ethereum']>;
+type Provider = NonNullable<Window['ethereum']> & {
+  on?: (event: string, listener: (...args: unknown[]) => void) => void;
+  removeListener?: (event: string, listener: (...args: unknown[]) => void) => void;
+};
 
 export const CHAIN_ID = 61999;
 export const CONTRACT = (import.meta.env.VITE_CONTRACT_ADDRESS || '').trim();
@@ -19,6 +22,19 @@ export async function connectWallet(provider: Provider | undefined = window.ethe
   const chain = BigInt(String(await provider.request({ method: 'eth_chainId' })));
   if (chain !== BigInt(CHAIN_ID)) throw new Error('Switch the wallet to GenLayer Studionet (chain ID 61999).');
   return account;
+}
+
+export async function walletState(provider: Provider | undefined = window.ethereum) {
+  if (!provider?.request) return { account: '', wrongNetwork: false };
+  const [accounts, chainId] = await Promise.all([
+    provider.request({ method: 'eth_accounts' }) as Promise<string[]>,
+    provider.request({ method: 'eth_chainId' }) as Promise<string>,
+  ]);
+  const account = accounts?.[0] || '';
+  return {
+    account: /^0x[a-fA-F0-9]{40}$/.test(account) ? account : '',
+    wrongNetwork: BigInt(String(chainId)) !== BigInt(CHAIN_ID),
+  };
 }
 
 export async function connectedClient(expected: string, provider: Provider | undefined = window.ethereum) {
@@ -56,9 +72,15 @@ export async function writeFinalized(expectedAccount: string, functionName: stri
   const receipt = await client.waitForTransactionReceipt({
     hash: hash as TransactionHash,
     status: TransactionStatus.FINALIZED,
-  });
+  } as never) as Awaited<ReturnType<typeof client.waitForTransactionReceipt>> & {
+    consensus_data?: { leader_receipt?: Array<{ result?: unknown }> };
+  };
   if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
     throw new Error(`Transaction finalized with ${receipt.txExecutionResultName || 'no execution result'}.`);
+  }
+  const contractResult = receipt.consensus_data?.leader_receipt?.[0]?.result;
+  if (typeof contractResult === 'string' && /^(ONLY_PROJECT_CREATOR|PROJECT_NOT_FOUND|PROJECT_NOT_DRAFT|PROJECT_NOT_SEALED|COMPONENT_NOT_FOUND|EDGE_NOT_FOUND|STALE_COMPONENT_REVISION|STALE_PROJECT_REVISION|INVALID_|UNSUPPORTED_ECOSYSTEM|COMPONENT_LIMIT|EDGE_LIMIT|COMPONENT_ORDER_INVALID|DEPENDENCY_ORDER_INVALID|DEPENDENCY_ALREADY_EXISTS|COMPONENT_IDENTITY_NOT_CURRENT|COMPONENT_IDENTITY_ALREADY_CURRENT|COMPONENT_NOT_PATCHABLE|PATCH_NOT_PENDING|UPSTREAM_STILL_VULNERABLE|UPSTREAM_NOT_STABLE|ADVISORY_ALREADY_ASSESSED|FINDING_LIMIT|PENDING_ADVISORY_LIMIT|VERSION_HISTORY_LIMIT|COMPONENT_NOT_RECHECK_REQUIRED|NO_DEPENDENCIES)/.test(contractResult)) {
+    throw new Error(`${functionName} finalized without changing state: ${contractResult}.`);
   }
   return hash;
 }

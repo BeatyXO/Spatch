@@ -9,7 +9,8 @@ import pytest
 CREATOR = "0x1111111111111111111111111111111111111111"
 OBSERVER = "0x2222222222222222222222222222222222222222"
 OUTSIDER = "0x3333333333333333333333333333333333333333"
-GHSA = "GHSA-2g3v-6x4w-9r2p"
+GHSA = "GHSA-2G3V-6X4W-9R2P"
+GHSA_B = "GHSA-3P2H-W9Q8-4V6R"
 
 
 class TreeMap(dict):
@@ -113,8 +114,9 @@ class Nondet:
                 return Response(404, b"{}")
             return Response(200, json.dumps(payload).encode())
         if "api.osv.dev" in url:
+            advisory_id = url.rsplit("/", 1)[-1].upper()
             payload = {
-                "id": GHSA,
+                "id": advisory_id,
                 "aliases": ["CVE-2026-12345"],
                 "affected": [
                     {
@@ -133,8 +135,9 @@ class Nondet:
             }
             return Response(200, json.dumps(payload).encode())
         if "api.github.com/advisories" in url:
+            advisory_id = url.rsplit("/", 1)[-1].upper()
             payload = {
-                "ghsa_id": GHSA,
+                "ghsa_id": advisory_id,
                 "cve_id": "CVE-2026-12345",
                 "summary": "Template rendering vulnerability",
                 "description": "Versions before 3.1.6 are affected in a specific rendering path.",
@@ -192,6 +195,15 @@ def verify_and_seal(contract):
         assert int(aid) == cid
         assert contract.get_component(U256(cid))["status"] == "ACTIVE"
     assert contract.seal_project(U256(1)) == "SEALED"
+
+
+def advisory_rows(contract, dep_verdict, dep_reason, app_verdict="NOT_AFFECTED", app_reason="PACKAGE_NOT_TARGETED"):
+    dep = contract.get_component(U256(1))
+    app = contract.get_component(U256(2))
+    return {"results": [
+        {"component_id": 1, "component_revision": dep["revision"], "version_revision": dep["version_revision"], "verdict": dep_verdict, "reason_code": dep_reason, "fixed_version": "3.1.6"},
+        {"component_id": 2, "component_revision": app["revision"], "version_revision": app["version_revision"], "verdict": app_verdict, "reason_code": app_reason, "fixed_version": ""},
+    ]}
 
 
 def test_components_start_unverified_and_seal_fails(runtime):
@@ -293,7 +305,8 @@ def test_patch_preserves_history_requires_fresh_identity_and_allows_reassessment
     identity_aid = contract.verify_patch(U256(1), U256(staged["revision"]))
     assert int(identity_aid) == 4
     patched = contract.get_component(U256(1))
-    assert patched["status"] == "ACTIVE"
+    assert patched["status"] == "SECURITY_REASSESS_REQUIRED"
+    assert patched["security_status"] == "SECURITY_REASSESS_REQUIRED"
     assert patched["version"] == "3.1.6"
     assert patched["verified_version_revision"] == 2
 
@@ -306,6 +319,7 @@ def test_patch_preserves_history_requires_fresh_identity_and_allows_reassessment
     reassessment = contract.assess_advisory(U256(1), GHSA)
     assert int(reassessment) == 5
     assert contract.get_component(U256(1))["status"] == "ACTIVE"
+    assert contract.get_findings(U256(1))["pending_advisories"] == []
 
     # The dependent can now deterministically clear its recheck state without another LLM call.
     dependent = contract.get_component(U256(2))
@@ -323,7 +337,114 @@ def test_source_failure_fails_closed(runtime):
     assessment = contract.get_assessment(aid)
     assert assessment["status"] == "UNRESOLVED"
     assert assessment["reason"] == "ADVISORY_SOURCE_UNAVAILABLE"
+    assert contract.get_component(U256(1))["status"] == "UNRESOLVED"
+    assert contract.get_findings(U256(1))["current"][0]["reason_code"] == "ADVISORY_SOURCE_UNAVAILABLE"
+
+
+def test_cross_advisory_not_affected_cannot_clear_another_vulnerability(runtime):
+    contract, gl, nondet = runtime
+    verify_and_seal(contract)
+    nondet.answer = advisory_rows(contract, "AFFECTED", "VERSION_IN_AFFECTED_RANGE")
+    contract.assess_advisory(U256(1), GHSA)
+    assert contract.get_component(U256(1))["status"] == "VULNERABLE"
+
+    nondet.answer = advisory_rows(contract, "NOT_AFFECTED", "VERSION_OUTSIDE_AFFECTED_RANGE")
+    gl.message.sender_address = OBSERVER
+    contract.assess_advisory(U256(1), GHSA_B)
+    root = contract.get_component(U256(1))
+    findings = contract.get_findings(U256(1))["current"]
+    assert root["status"] == "VULNERABLE"
+    assert {f["advisory_id"]: f["verdict"] for f in findings} == {GHSA: "AFFECTED", GHSA_B: "NOT_AFFECTED"}
+
+
+def test_multiple_findings_require_all_affected_and_unresolved_advisories_resolved(runtime):
+    contract, gl, nondet = runtime
+    verify_and_seal(contract)
+    nondet.answer = advisory_rows(contract, "AFFECTED", "VERSION_IN_AFFECTED_RANGE")
+    contract.assess_advisory(U256(1), GHSA)
+    nondet.answer = advisory_rows(contract, "AFFECTED", "VERSION_IN_AFFECTED_RANGE")
+    contract.assess_advisory(U256(1), GHSA_B)
+    assert contract.get_component(U256(1))["status"] == "VULNERABLE"
+
+    gl.message.sender_address = CREATOR
+    root = contract.get_component(U256(1))
+    assert contract.patch_component(U256(1), "3.1.6", U256(root["revision"])) == "PATCH_VERSION_STAGED"
+    staged = contract.get_component(U256(1))
+    gl.message.sender_address = OBSERVER
+    contract.verify_patch(U256(1), U256(staged["revision"]))
+    assert contract.get_component(U256(1))["status"] == "SECURITY_REASSESS_REQUIRED"
+
+    nondet.answer = {"results": [{
+        "component_id": 1,
+        "component_revision": contract.get_component(U256(1))["revision"],
+        "version_revision": 2,
+        "verdict": "NOT_AFFECTED",
+        "reason_code": "VERSION_OUTSIDE_AFFECTED_RANGE",
+        "fixed_version": "3.1.6",
+    }]}
+    contract.assess_advisory(U256(1), GHSA)
+    assert contract.get_component(U256(1))["status"] == "SECURITY_REASSESS_REQUIRED"
+    assert contract.get_findings(U256(1))["pending_advisories"] == [GHSA_B]
+
+    nondet.answer = {"results": [{
+        "component_id": 1,
+        "component_revision": contract.get_component(U256(1))["revision"],
+        "version_revision": 2,
+        "verdict": "UNRESOLVED",
+        "reason_code": "SOURCE_CONFLICT",
+        "fixed_version": "",
+    }]}
+    contract.assess_advisory(U256(1), GHSA_B)
+    assert contract.get_component(U256(1))["status"] == "UNRESOLVED"
+
+    nondet.answer = {"results": [{
+        "component_id": 1,
+        "component_revision": contract.get_component(U256(1))["revision"],
+        "version_revision": 2,
+        "verdict": "NOT_AFFECTED",
+        "reason_code": "VERSION_OUTSIDE_AFFECTED_RANGE",
+        "fixed_version": "3.1.6",
+    }]}
+    contract.assess_advisory(U256(1), GHSA_B)
     assert contract.get_component(U256(1))["status"] == "ACTIVE"
+    findings = contract.get_findings(U256(1))
+    assert {f["advisory_id"]: f["verdict"] for f in findings["current"]} == {
+        GHSA: "NOT_AFFECTED", GHSA_B: "NOT_AFFECTED"
+    }
+
+
+def test_unresolved_advisory_is_retryable_but_terminal_result_replays_are_blocked(runtime):
+    contract, gl, nondet = runtime
+    verify_and_seal(contract)
+    nondet.answer = advisory_rows(contract, "UNRESOLVED", "INSUFFICIENT_RANGE_DETAIL", "UNRESOLVED", "SOURCE_CONFLICT")
+    first_id = contract.assess_advisory(U256(1), GHSA)
+    assert contract.get_component(U256(1))["status"] == "UNRESOLVED"
+    assert not contract.used_advisory.get("1:1:1:" + GHSA)
+    unresolved_component = contract.get_component(U256(1))
+    assert contract.verify_component(U256(1), U256(unresolved_component["revision"])) == "COMPONENT_IDENTITY_ALREADY_CURRENT"
+    assert contract.get_component(U256(1))["status"] == "UNRESOLVED"
+
+    nondet.answer = advisory_rows(contract, "NOT_AFFECTED", "VERSION_OUTSIDE_AFFECTED_RANGE")
+    gl.message.sender_address = OBSERVER
+    second_id = contract.assess_advisory(U256(1), GHSA)
+    assert int(second_id) > int(first_id)
+    assert contract.get_component(U256(1))["status"] == "ACTIVE"
+    assert contract.get_findings(U256(1))["current"][0]["attempts"] == 2
+    count = contract.get_counts()["assessments"]
+    assert contract.assess_advisory(U256(1), GHSA) == "ADVISORY_ALREADY_ASSESSED_FOR_CURRENT_REVISIONS"
+    assert contract.get_counts()["assessments"] == count
+
+
+def test_identity_verification_cannot_clear_security_recheck(runtime):
+    contract, gl, nondet = runtime
+    verify_and_seal(contract)
+    nondet.answer = advisory_rows(contract, "AFFECTED", "VERSION_IN_AFFECTED_RANGE")
+    contract.assess_advisory(U256(1), GHSA)
+    dependent = contract.get_component(U256(2))
+    assert dependent["status"] == "RECHECK_REQUIRED"
+    gl.message.sender_address = OBSERVER
+    assert contract.verify_component(U256(2), U256(dependent["revision"])) == "COMPONENT_IDENTITY_ALREADY_CURRENT"
+    assert contract.get_component(U256(2))["status"] == "RECHECK_REQUIRED"
 
 
 def test_protocol_declares_revision_scoped_replay_and_stable_studionet(runtime):
@@ -332,4 +453,5 @@ def test_protocol_declares_revision_scoped_replay_and_stable_studionet(runtime):
     assert protocol["name"] == "Spatch"
     assert protocol["chain_id"] == 61999
     assert protocol["replay_scope"] == "project:component:version_revision:advisory"
-    assert "old-version-history-preserved" in protocol["patch_policy"]
+    assert protocol["version"] == 2
+    assert "old findings preserved" in protocol["patch_policy"]

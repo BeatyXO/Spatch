@@ -9,6 +9,8 @@ from datetime import datetime
 MAX_COMPONENTS = 16
 MAX_EDGES = 32
 MAX_HISTORY = 8
+MAX_FINDINGS = 32
+MAX_PENDING_ADVISORIES = 16
 MAX_TEXT = 160
 MAX_SOURCE_BODY = 180000
 
@@ -20,6 +22,7 @@ VERIFIED = "VERIFIED"
 VULNERABLE = "VULNERABLE"
 PATCH_PENDING = "PATCH_PENDING"
 RECHECK_REQUIRED = "RECHECK_REQUIRED"
+SECURITY_REASSESS_REQUIRED = "SECURITY_REASSESS_REQUIRED"
 UNRESOLVED = "UNRESOLVED"
 
 AFFECTED = "AFFECTED"
@@ -207,7 +210,86 @@ class Spatch(gl.Contract):
         self.projects[u256(project["id"])] = canon(project)
 
     def _save_component(self, component):
+        self._refresh_component(component)
         self.components[u256(component["id"])] = canon(component)
+
+    def _security_status(self, component):
+        current_revision = int(component["version_revision"])
+        findings = [
+            finding for finding in component.get("findings", [])
+            if int(finding.get("version_revision", 0)) == current_revision
+        ]
+        if any(finding.get("verdict") == AFFECTED for finding in findings):
+            return VULNERABLE
+        if any(
+            finding.get("verdict") == UNRESOLVED
+            and finding.get("advisory_id") in component.get("pending_advisories", [])
+            for finding in findings
+        ):
+            return UNRESOLVED
+        if component.get("pending_advisories"):
+            return SECURITY_REASSESS_REQUIRED
+        if component.get("dependency_recheck", False):
+            return RECHECK_REQUIRED
+        if int(component.get("verified_version_revision", 0)) != current_revision:
+            return "NOT_ASSESSED"
+        return ACTIVE
+
+    def _refresh_component(self, component):
+        component["security_status"] = self._security_status(component)
+        identity_current = int(component.get("verified_version_revision", 0)) == int(component["version_revision"])
+        if identity_current:
+            component["status"] = component["security_status"]
+        elif component.get("patch_pending", False):
+            component["status"] = PATCH_PENDING
+        elif component.get("identity_status") == UNRESOLVED:
+            component["status"] = UNRESOLVED
+        else:
+            component["status"] = PENDING_IDENTITY
+
+    def _finding_index(self, component, version_revision, advisory_id):
+        for index, finding in enumerate(component.get("findings", [])):
+            if int(finding.get("version_revision", 0)) == int(version_revision) and finding.get("advisory_id") == advisory_id:
+                return index
+        return -1
+
+    def _store_finding(self, component, version_revision, advisory_id, verdict, reason_code, fixed_version, assessment_id):
+        findings = component.setdefault("findings", [])
+        index = self._finding_index(component, version_revision, advisory_id)
+        if index < 0:
+            if len(findings) >= MAX_FINDINGS:
+                return False
+            findings.append({
+                "advisory_id": advisory_id,
+                "component_id": int(component["id"]),
+                "version_revision": int(version_revision),
+                "verdict": verdict,
+                "reason_code": reason_code,
+                "assessment_id": int(assessment_id),
+                "fixed_version": fixed_version,
+                "attempts": 1,
+            })
+        else:
+            finding = findings[index]
+            # Terminal verdicts are immutable for a version/advisory pair.
+            if finding.get("verdict") != UNRESOLVED:
+                return False
+            finding.update({
+                "verdict": verdict,
+                "reason_code": reason_code,
+                "assessment_id": int(assessment_id),
+                "fixed_version": fixed_version,
+                "attempts": int(finding.get("attempts", 0)) + 1,
+            })
+        pending = component.setdefault("pending_advisories", [])
+        if verdict == UNRESOLVED:
+            if advisory_id not in pending:
+                if len(pending) >= MAX_PENDING_ADVISORIES:
+                    return False
+                pending.append(advisory_id)
+        elif advisory_id in pending:
+            pending.remove(advisory_id)
+        return True
 
     def _save_edge(self, edge):
         self.edges[u256(edge["id"])] = canon(edge)
@@ -249,8 +331,8 @@ class Spatch(gl.Contract):
                 cid = dependent["id"]
                 if cid in seen:
                     continue
-                if dependent["status"] not in (VULNERABLE, PATCH_PENDING):
-                    dependent["status"] = RECHECK_REQUIRED
+                if not dependent.get("dependency_recheck", False):
+                    dependent["dependency_recheck"] = True
                     dependent["reason"] = "UPSTREAM_COMPONENT_CHANGED_SECURITY_STATE"
                     dependent["last_assessment_id"] = int(assessment_id)
                     dependent["revision"] += 1
@@ -323,6 +405,11 @@ class Spatch(gl.Contract):
             "verified_version_revision": 0,
             "identity_status": "NOT_VERIFIED",
             "identity_evidence_digest": "",
+            "security_status": "NOT_ASSESSED",
+            "findings": [],
+            "pending_advisories": [],
+            "dependency_recheck": False,
+            "patch_pending": False,
             "last_assessment_id": 0,
             "last_advisory_id": "",
             "reason": "IDENTITY_NOT_VERIFIED",
@@ -382,7 +469,13 @@ class Spatch(gl.Contract):
             return "PROJECT_NOT_FOUND"
         if project["status"] not in (DRAFT, SEALED):
             return "PROJECT_STATE_INVALID"
-        if project["status"] == SEALED and component["status"] not in (PATCH_PENDING, RECHECK_REQUIRED, UNRESOLVED, PENDING_IDENTITY):
+        identity_current = int(component["verified_version_revision"]) == int(component["version_revision"])
+        if identity_current:
+            return "COMPONENT_IDENTITY_ALREADY_CURRENT"
+        if component.get("patch_pending", False):
+            if project["status"] != SEALED:
+                return "PROJECT_STATE_INVALID"
+        elif component.get("identity_status") not in ("NOT_VERIFIED", UNRESOLVED):
             return "COMPONENT_NOT_REVERIFYABLE"
         url = deps_url(component["ecosystem"], component["name"], component["version"])
         if not url:
@@ -435,9 +528,7 @@ class Spatch(gl.Contract):
         })
         component["last_assessment_id"] = int(aid)
         if verified:
-            component["status"] = ACTIVE
             component["identity_status"] = VERIFIED
-            component["reason"] = "EXACT_COMPONENT_VERIFIED"
             component["verified_version_revision"] = component["version_revision"]
             component["identity_evidence_digest"] = digest_json({
                 "component_id": int(component_id),
@@ -447,8 +538,9 @@ class Spatch(gl.Contract):
                 "version": component["version"],
                 "source_digest": result.get("source_digest", ""),
             })
+            component["patch_pending"] = False
+            component["reason"] = "EXACT_COMPONENT_VERIFIED"
         else:
-            component["status"] = UNRESOLVED
             component["identity_status"] = UNRESOLVED
             component["reason"] = result.get("reason", "IDENTITY_MISMATCH")
             component["verified_version_revision"] = 0
@@ -460,6 +552,11 @@ class Spatch(gl.Contract):
 
     @gl.public.write
     def verify_component(self, component_id: u256, expected_revision: u256) -> typing.Any:
+        component = self._component(component_id)
+        if component is None:
+            return "COMPONENT_NOT_FOUND"
+        if component.get("patch_pending", False):
+            return "USE_VERIFY_PATCH"
         return self._verify_component_identity(component_id, expected_revision)
 
     @gl.public.write
@@ -502,21 +599,22 @@ class Spatch(gl.Contract):
         if not valid_ghsa(advisory_id):
             return "INVALID_GHSA_ID"
         candidates = []
-        replay_keys = []
         for cid in project["component_ids"]:
             component = self._component(u256(cid))
-            if component and component["status"] in (ACTIVE, RECHECK_REQUIRED, VULNERABLE, UNRESOLVED):
+            if component and int(component.get("verified_version_revision", 0)) == int(component["version_revision"]):
                 key = str(int(project_id)) + ":" + str(component["id"]) + ":" + str(component["version_revision"]) + ":" + advisory_id
-                if not self.used_advisory.get(key):
-                    candidates.append({
-                        "component_id": component["id"],
-                        "component_revision": component["revision"],
-                        "version_revision": component["version_revision"],
-                        "ecosystem": component["ecosystem"],
-                        "name": component["name"],
-                        "version": component["version"],
-                    })
-                    replay_keys.append(key)
+                if self.used_advisory.get(key):
+                    continue
+                if self._finding_index(component, component["version_revision"], advisory_id) < 0 and len(component.get("findings", [])) >= MAX_FINDINGS:
+                    return "FINDING_LIMIT"
+                candidates.append({
+                    "component_id": component["id"],
+                    "component_revision": component["revision"],
+                    "version_revision": component["version_revision"],
+                    "ecosystem": component["ecosystem"],
+                    "name": component["name"],
+                    "version": component["version"],
+                })
         if not candidates:
             return "ADVISORY_ALREADY_ASSESSED_FOR_CURRENT_REVISIONS"
         # OSV resolves GHSA paths case-sensitively: retain the canonical GHSA-
@@ -585,6 +683,8 @@ class Spatch(gl.Contract):
                         return canon({"kind": UNRESOLVED, "reason": "MODEL_CONTRADICTION"})
                     if row["verdict"] == NOT_AFFECTED and row["reason_code"] not in ("VERSION_OUTSIDE_AFFECTED_RANGE", "PACKAGE_NOT_TARGETED"):
                         return canon({"kind": UNRESOLVED, "reason": "MODEL_CONTRADICTION"})
+                    if row["verdict"] == UNRESOLVED and row["reason_code"] not in ("SOURCE_CONFLICT", "INSUFFICIENT_RANGE_DETAIL"):
+                        return canon({"kind": UNRESOLVED, "reason": "MODEL_CONTRADICTION"})
                 return canon({
                     "kind": "ASSESSED",
                     "advisory_id": advisory_id,
@@ -617,6 +717,17 @@ class Spatch(gl.Contract):
         projection = decision_projection(consensus)
         if projection is None:
             consensus = {"kind": UNRESOLVED, "reason": "CONSENSUS_RESULT_INVALID"}
+        rows = consensus.get("results", []) if consensus.get("kind") == "ASSESSED" else []
+        if consensus.get("kind") == UNRESOLVED:
+            failure_reason = str(consensus.get("reason", "ADVISORY_RESULT_UNRESOLVED"))[:64]
+            rows = [{
+                "component_id": expected["component_id"],
+                "component_revision": expected["component_revision"],
+                "version_revision": expected["version_revision"],
+                "verdict": UNRESOLVED,
+                "reason_code": failure_reason,
+                "fixed_version": "",
+            } for expected in candidates]
         aid = self._record_assessment({
             "project_id": int(project_id),
             "phase": "ADVISORY_APPLICABILITY",
@@ -626,31 +737,40 @@ class Spatch(gl.Contract):
             "reason": consensus.get("reason", ""),
             "diagnostic": consensus.get("diagnostic", ""),
             "source_digest": consensus.get("source_digest", ""),
-            "results": consensus.get("results", []),
+            "results": rows,
         })
         project["last_assessment_id"] = int(aid)
         self._save_project(project)
-        if consensus.get("kind") != "ASSESSED":
-            return aid
         vulnerable_roots = []
-        for row, key in zip(consensus["results"], replay_keys):
+        # Source/model/validator uncertainty is an explicit retryable finding.
+        for row in rows:
             component = self._component(u256(row["component_id"]))
             # Overall state revision and version revision are both rechecked before mutation.
             if component is None or component["revision"] != row["component_revision"] or component["version_revision"] != row["version_revision"]:
+                continue
+            if not self._store_finding(
+                component,
+                row["version_revision"],
+                advisory_id,
+                row["verdict"],
+                row["reason_code"],
+                row.get("fixed_version", ""),
+                aid,
+            ):
                 continue
             component["last_assessment_id"] = int(aid)
             component["last_advisory_id"] = advisory_id
             component["reason"] = row["reason_code"]
             component["revision"] += 1
             if row["verdict"] == AFFECTED:
-                component["status"] = VULNERABLE
-                vulnerable_roots.append(component["id"])
+                key = str(int(project_id)) + ":" + str(component["id"]) + ":" + str(component["version_revision"]) + ":" + advisory_id
+                self.used_advisory[key] = str(int(aid))
             elif row["verdict"] == NOT_AFFECTED:
-                component["status"] = ACTIVE
-            else:
-                component["status"] = UNRESOLVED
+                key = str(int(project_id)) + ":" + str(component["id"]) + ":" + str(component["version_revision"]) + ":" + advisory_id
+                self.used_advisory[key] = str(int(aid))
+            if row["verdict"] in (AFFECTED, UNRESOLVED):
+                vulnerable_roots.append(component["id"])
             self._save_component(component)
-            self.used_advisory[key] = str(int(aid))
         # Propagate only after every direct advisory result has been applied, so direct
         # component rows cannot be invalidated by traversal order inside this transaction.
         for root_id in vulnerable_roots:
@@ -670,12 +790,27 @@ class Spatch(gl.Contract):
             return "PROJECT_NOT_SEALED"
         if sender() != project["creator"]:
             return "ONLY_PROJECT_CREATOR"
-        if component["status"] not in (VULNERABLE, RECHECK_REQUIRED, UNRESOLVED):
+        if component["status"] not in (VULNERABLE, RECHECK_REQUIRED, UNRESOLVED, SECURITY_REASSESS_REQUIRED):
             return "COMPONENT_NOT_PATCHABLE"
         if not new_version or len(new_version) > 80 or new_version == component["version"]:
             return "INVALID_PATCH_VERSION"
         if len(component["history"]) >= MAX_HISTORY:
             return "VERSION_HISTORY_LIMIT"
+        current_findings = [
+            finding for finding in component.get("findings", [])
+            if int(finding.get("version_revision", 0)) == int(component["version_revision"])
+        ]
+        pending = list(component.get("pending_advisories", []))
+        for finding in current_findings:
+            if finding.get("verdict") in (AFFECTED, UNRESOLVED) and finding["advisory_id"] not in pending:
+                pending.append(finding["advisory_id"])
+        if len(pending) > MAX_PENDING_ADVISORIES:
+            return "PENDING_ADVISORY_LIMIT"
+        finding_refs = [{
+            "advisory_id": finding["advisory_id"],
+            "verdict": finding["verdict"],
+            "assessment_id": finding["assessment_id"],
+        } for finding in current_findings]
         component["history"].append({
             "version": component["version"],
             "revision": component["revision"],
@@ -683,12 +818,14 @@ class Spatch(gl.Contract):
             "status": component["status"],
             "advisory_id": component["last_advisory_id"],
             "assessment_id": component["last_assessment_id"],
+            "findings": finding_refs,
             "retired_at": now(),
         })
         component["version"] = new_version
         component["revision"] += 1
         component["version_revision"] += 1
-        component["status"] = PATCH_PENDING
+        component["patch_pending"] = True
+        component["pending_advisories"] = pending
         component["verified_version_revision"] = 0
         component["identity_status"] = "NOT_VERIFIED"
         component["identity_evidence_digest"] = ""
@@ -699,6 +836,11 @@ class Spatch(gl.Contract):
 
     @gl.public.write
     def verify_patch(self, component_id: u256, expected_revision: u256) -> typing.Any:
+        component = self._component(component_id)
+        if component is None:
+            return "COMPONENT_NOT_FOUND"
+        if not component.get("patch_pending", False):
+            return "PATCH_NOT_PENDING"
         return self._verify_component_identity(component_id, expected_revision)
 
     @gl.public.write
@@ -711,7 +853,7 @@ class Spatch(gl.Contract):
         project = self._project(u256(component["project_id"]))
         if project is None or project["status"] != SEALED:
             return "PROJECT_NOT_SEALED"
-        if component["status"] != RECHECK_REQUIRED:
+        if component["status"] != RECHECK_REQUIRED or not component.get("dependency_recheck", False):
             return "COMPONENT_NOT_RECHECK_REQUIRED"
         if component["identity_status"] != VERIFIED or component["verified_version_revision"] != component["version_revision"]:
             return "COMPONENT_IDENTITY_NOT_CURRENT"
@@ -721,7 +863,7 @@ class Spatch(gl.Contract):
         for dependency in dependencies:
             if dependency["status"] == VULNERABLE:
                 return "UPSTREAM_STILL_VULNERABLE"
-            if dependency["status"] != ACTIVE:
+            if dependency["status"] != ACTIVE or dependency.get("security_status") != ACTIVE:
                 return "UPSTREAM_NOT_STABLE"
         aid = self._record_assessment({
             "project_id": component["project_id"],
@@ -733,7 +875,7 @@ class Spatch(gl.Contract):
             "reason": "ALL_DIRECT_DEPENDENCIES_ACTIVE",
             "dependency_ids": [dependency["id"] for dependency in dependencies],
         })
-        component["status"] = ACTIVE
+        component["dependency_recheck"] = False
         component["reason"] = "DEPENDENCIES_STABLE_AFTER_RECHECK"
         component["last_assessment_id"] = int(aid)
         component["revision"] += 1
@@ -761,6 +903,34 @@ class Spatch(gl.Contract):
         return json.loads(self.assessments[assessment_id])
 
     @gl.public.view
+    def get_findings(self, component_id: u256) -> dict:
+        component = self._component(component_id)
+        if component is None:
+            return {}
+        current_revision = int(component["version_revision"])
+        current = []
+        historical = []
+        for finding in component.get("findings", []):
+            row = dict(finding)
+            row["current"] = int(finding.get("version_revision", 0)) == current_revision
+            if row["current"]:
+                current.append(row)
+            else:
+                historical.append(row)
+        return {
+            "component_id": int(component_id),
+            "version_revision": current_revision,
+            "security_status": component.get("security_status", "NOT_ASSESSED"),
+            "pending_advisories": list(component.get("pending_advisories", [])),
+            "current": current,
+            "historical": historical,
+        }
+
+    @gl.public.view
+    def get_security_findings(self, component_id: u256) -> dict:
+        return self.get_findings(component_id)
+
+    @gl.public.view
     def get_counts(self) -> dict:
         return {
             "projects": int(self.project_count),
@@ -773,14 +943,14 @@ class Spatch(gl.Contract):
     def get_protocol(self) -> dict:
         return {
             "name": "Spatch",
-            "version": 1,
+            "version": 2,
             "network_target": "studionet",
             "chain_id": 61999,
             "architecture": "revision-scoped-advisory-consensus-with-deterministic-blast-radius",
             "sources": ["deps.dev", "OSV", "GitHub Advisory Database"],
             "custody": False,
             "replay_scope": "project:component:version_revision:advisory",
-            "patch_policy": "old-version-history-preserved-new-version-must-be-reverified",
+            "patch_policy": "identity-is-separate-from-security; old findings preserved; patches require pending advisories reassessed",
         }
 
 

@@ -39,6 +39,7 @@ a { color: inherit; text-decoration: none; }
 .logo-mark svg { opacity: .25; transform: scale(1.4); }
 .header-actions { display: flex; align-items: center; gap: 10px; }
 .network { color: #cbe8ff; font-size: 12px; padding: 9px 12px; border: 1px solid rgba(137,200,255,.16); border-radius: 999px; background: rgba(7,38,82,.45); }
+.network-wrong { color: #ffd1d8; border-color: rgba(255,103,125,.55); background: rgba(110,22,47,.4); }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #56e1ff; box-shadow: 0 0 12px #56e1ff; margin-right: 7px; }
 main { width: min(1380px, calc(100% - 34px)); margin: 0 auto; padding: 68px 0 54px; }
 .hero { display: grid; grid-template-columns: 1.12fr .88fr; align-items: center; gap: 54px; min-height: 515px; }

@@ -6,6 +6,7 @@ import pytest
 
 GHSA = "GHSA-GMJ6-6F8F-6699"
 OSV_GHSA = "GHSA-" + GHSA[5:].lower()
+GHSA_B = "GHSA-3P2H-W9Q8-4V6R"
 
 
 def web_json(vm, pattern, value, status=200):
@@ -18,16 +19,17 @@ def identity(vm, name, version):
     })
 
 
-def advisory_sources(vm):
-    web_json(vm, rf"api\.osv\.dev/v1/vulns/{OSV_GHSA}", {
-        "id": GHSA,
+def advisory_sources(vm, advisory_id=GHSA):
+    osv_id = "GHSA-" + advisory_id[5:].lower()
+    web_json(vm, rf"api\.osv\.dev/v1/vulns/{osv_id}", {
+        "id": advisory_id,
         "affected": [{
             "package": {"ecosystem": "PyPI", "name": "jinja2"},
             "ranges": [{"type": "ECOSYSTEM", "events": [{"introduced": "3.0.0"}, {"fixed": "3.1.5"}]}],
         }],
     })
-    web_json(vm, rf"api\.github\.com/advisories/{GHSA}", {
-        "ghsa_id": GHSA,
+    web_json(vm, rf"api\.github\.com/advisories/{advisory_id}", {
+        "ghsa_id": advisory_id,
         "summary": "Jinja sandbox breakout through malicious filenames",
         "description": "Jinja2 releases through 3.1.4 are affected.",
         "vulnerabilities": [{
@@ -98,8 +100,17 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
         row(app_id, app["revision"], app["version_revision"], "NOT_AFFECTED", "PACKAGE_NOT_TARGETED"),
     ]})
     assert direct_vm.run_validator(leader_result=conflicting) is False
+    fixed_conflict = json.dumps({"kind": "ASSESSED", "advisory_id": GHSA, "results": [
+        row(dep_id, dep["revision"], dep["version_revision"], "AFFECTED", "VERSION_IN_AFFECTED_RANGE", "9.9.9"),
+        rows[1],
+    ]})
+    assert direct_vm.run_validator(leader_result=fixed_conflict) is False
     assert contract.get_component(dep_id)["status"] == "VULNERABLE"
     assert contract.get_component(app_id)["status"] == "RECHECK_REQUIRED"
+    app = contract.get_component(app_id)
+    assert contract.verify_component(app_id, app["revision"]) == "COMPONENT_IDENTITY_ALREADY_CURRENT"
+    assert contract.get_component(app_id)["status"] == "RECHECK_REQUIRED"
+    assert contract.get_findings(dep_id)["current"][0]["verdict"] == "AFFECTED"
     count = contract.get_counts()["assessments"]
     assert contract.assess_advisory(project_id, GHSA) == "ADVISORY_ALREADY_ASSESSED_FOR_CURRENT_REVISIONS"
     assert contract.get_counts()["assessments"] == count
@@ -120,7 +131,9 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
     assert int(contract.verify_patch(dep_id, staged["revision"])) > 0
     patched = contract.get_component(dep_id)
     assert patched["version_revision"] == 2
-    assert patched["status"] == "ACTIVE"
+    assert patched["status"] == "SECURITY_REASSESS_REQUIRED"
+    assert patched["security_status"] == "SECURITY_REASSESS_REQUIRED"
+    assert contract.get_findings(dep_id)["pending_advisories"] == [GHSA]
 
     advisory_sources(direct_vm)
     direct_vm.mock_llm(".*", judgment([
@@ -129,6 +142,7 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
     next_assessment = int(contract.assess_advisory(project_id, GHSA))
     assert next_assessment > assessment_id
     assert contract.get_component(dep_id)["status"] == "ACTIVE"
+    assert contract.get_findings(dep_id)["pending_advisories"] == []
     app = contract.get_component(app_id)
     assert int(contract.reassess_dependency(app_id, app["revision"])) > next_assessment
     assert contract.get_component(app_id)["status"] == "ACTIVE"
@@ -176,7 +190,71 @@ def test_direct_malformed_model_output_fails_closed(direct_deploy, direct_vm, di
     assessment = contract.get_assessment(assessment_id)
     assert assessment["status"] == "UNRESOLVED"
     assert assessment["reason"] == "MODEL_SCHEMA_INVALID", assessment
-    assert contract.get_component(dep_id)["status"] == "ACTIVE"
+    assert contract.get_component(dep_id)["status"] == "UNRESOLVED"
+    assert contract.get_findings(dep_id)["current"][0]["verdict"] == "UNRESOLVED"
+    assert contract.verify_component(dep_id, contract.get_component(dep_id)["revision"]) == "COMPONENT_IDENTITY_ALREADY_CURRENT"
+    assert contract.get_component(dep_id)["status"] == "UNRESOLVED"
+
+
+def test_direct_cross_advisory_not_affected_preserves_vulnerability(
+    direct_deploy, direct_vm, direct_alice, direct_bob,
+):
+    contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
+    project_id, dep_id, app_id = draft(contract, direct_vm, direct_alice)
+    verified_sealed(contract, direct_vm, project_id, dep_id, app_id, direct_bob)
+    dep = contract.get_component(dep_id)
+    app = contract.get_component(app_id)
+    advisory_sources(direct_vm, GHSA)
+    direct_vm.mock_llm(".*", judgment([
+        row(dep_id, dep["revision"], dep["version_revision"], "AFFECTED", "VERSION_IN_AFFECTED_RANGE", "3.1.5"),
+        row(app_id, app["revision"], app["version_revision"], "NOT_AFFECTED", "PACKAGE_NOT_TARGETED"),
+    ]))
+    assert int(contract.assess_advisory(project_id, GHSA)) > 0
+    assert contract.get_component(dep_id)["status"] == "VULNERABLE"
+
+    direct_vm.clear_mocks()
+    advisory_sources(direct_vm, GHSA_B)
+    dep = contract.get_component(dep_id)
+    app = contract.get_component(app_id)
+    direct_vm.mock_llm(".*", judgment([
+        row(dep_id, dep["revision"], dep["version_revision"], "NOT_AFFECTED", "VERSION_OUTSIDE_AFFECTED_RANGE", "3.1.5"),
+        row(app_id, app["revision"], app["version_revision"], "NOT_AFFECTED", "PACKAGE_NOT_TARGETED"),
+    ]))
+    assert int(contract.assess_advisory(project_id, GHSA_B)) > 0
+    assert contract.get_component(dep_id)["status"] == "VULNERABLE"
+    findings = contract.get_findings(dep_id)["current"]
+    assert {finding["advisory_id"]: finding["verdict"] for finding in findings} == {
+        GHSA: "AFFECTED", GHSA_B: "NOT_AFFECTED",
+    }
+
+
+def test_direct_patch_identity_does_not_claim_safety_until_all_findings_reassessed(
+    direct_deploy, direct_vm, direct_alice, direct_bob,
+):
+    contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
+    project_id, dep_id, app_id = draft(contract, direct_vm, direct_alice)
+    verified_sealed(contract, direct_vm, project_id, dep_id, app_id, direct_bob)
+    for advisory_id in (GHSA, GHSA_B):
+        if advisory_id != GHSA:
+            direct_vm.clear_mocks()
+        advisory_sources(direct_vm, advisory_id)
+        dep = contract.get_component(dep_id)
+        app = contract.get_component(app_id)
+        direct_vm.mock_llm(".*", judgment([
+            row(dep_id, dep["revision"], dep["version_revision"], "AFFECTED", "VERSION_IN_AFFECTED_RANGE", "3.1.5"),
+            row(app_id, app["revision"], app["version_revision"], "NOT_AFFECTED", "PACKAGE_NOT_TARGETED"),
+        ]))
+        contract.assess_advisory(project_id, advisory_id)
+    direct_vm.sender = direct_alice
+    dep = contract.get_component(dep_id)
+    contract.patch_component(dep_id, "3.1.5", dep["revision"])
+    staged = contract.get_component(dep_id)
+    direct_vm.clear_mocks()
+    identity(direct_vm, "jinja2", "3.1.5")
+    direct_vm.sender = direct_bob
+    contract.verify_patch(dep_id, staged["revision"])
+    assert contract.get_component(dep_id)["status"] == "SECURITY_REASSESS_REQUIRED"
+    assert set(contract.get_findings(dep_id)["pending_advisories"]) == {GHSA, GHSA_B}
 
 
 @pytest.mark.parametrize(("source_response", "expected_diagnostic"), [
@@ -206,8 +284,22 @@ def test_direct_advisory_source_failures_fail_closed(
     assert assessment["status"] == "UNRESOLVED"
     assert assessment["reason"] == "ADVISORY_SOURCE_UNAVAILABLE"
     assert assessment["diagnostic"] == expected_diagnostic
-    assert contract.get_component(dep_id)["status"] == "ACTIVE"
-    assert contract.get_component(app_id)["status"] == "ACTIVE"
+    assert contract.get_component(dep_id)["status"] == "UNRESOLVED"
+    assert contract.get_component(app_id)["status"] == "UNRESOLVED"
+    assert len(assessment["results"]) == 2
+
+    direct_vm.clear_mocks()
+    advisory_sources(direct_vm)
+    dep = contract.get_component(dep_id)
+    app = contract.get_component(app_id)
+    direct_vm.mock_llm(".*", judgment([
+        row(dep_id, dep["revision"], dep["version_revision"], "AFFECTED", "VERSION_IN_AFFECTED_RANGE", "3.1.5"),
+        row(app_id, app["revision"], app["version_revision"], "NOT_AFFECTED", "PACKAGE_NOT_TARGETED"),
+    ]))
+    retry_id = int(contract.assess_advisory(project_id, GHSA))
+    assert retry_id > assessment_id
+    assert contract.get_component(dep_id)["status"] == "VULNERABLE"
+    assert contract.get_findings(dep_id)["current"][0]["attempts"] == 2
 
 
 def test_direct_component_and_edge_bounds(direct_deploy, direct_vm, direct_alice):

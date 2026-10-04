@@ -6,6 +6,8 @@ describe('presentation helpers', () => {
     expect(statusLabel('RECHECK_REQUIRED')).toBe('Recheck Required');
     expect(statusTone('VULNERABLE')).toBe('danger');
     expect(statusTone('ACTIVE')).toBe('success');
+    expect(statusTone('SECURITY_REASSESS_REQUIRED')).toBe('warning');
+    expect(statusTone('UNRESOLVED')).toBe('warning');
   });
 
   it('rejects unsafe ids before calldata creation', () => {

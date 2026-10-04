@@ -2,34 +2,30 @@
 
 ## Protected consequence
 
-A software component should only become `VULNERABLE` when validators agree that an exact GHSA advisory applies to the exact locked component version. Only deterministic contract logic may then propagate `RECHECK_REQUIRED` to dependents.
+Spatch records advisory-scoped judgments for exact package versions and propagates recheck obligations deterministically through a bounded dependency graph. It must not turn a narrow non-applicability result or package identity check into a global safety claim.
 
 ## Attacker controls
 
-- project title and component metadata they submit;
-- call timing and transaction ordering;
-- which supported GHSA identifier they ask Spatch to assess;
-- inert text present in upstream advisory descriptions;
-- repeated, stale and cross-object transactions.
+- project titles and package metadata supplied during creator-controlled construction;
+- transaction ordering, stale revisions, repeated calls, and GHSA choice;
+- untrusted advisory descriptions and source responses;
+- a leader's proposed semantic output.
 
-## Attacker does not control
+## Invariants
 
-- the authority hosts and URL shapes used for deps.dev, OSV and GitHub Advisory Database;
-- the exact component revision bound into an assessment;
-- independent validator source fetches;
-- the contract's deterministic dependency traversal;
-- bounded state transitions and replay key construction.
+1. The deployer has no privileged project review role.
+2. Construction and dependency mutation are creator-only; identity verification and advisory assessment are permissionless.
+3. Users provide only a bounded GHSA identifier, never arbitrary evidence URLs.
+4. Sealing requires exact current identity proof for every component.
+5. Advisory output binds component ID, component revision, version revision, GHSA, verdict, reason, and fixed version.
+6. Custom validators independently fetch and re-evaluate; disagreement or malformed evidence fails closed.
+7. Findings are bounded and advisory/version scoped. A later `NOT_AFFECTED` cannot clear an `AFFECTED` or unresolved finding for another GHSA.
+8. Identity verification cannot clear security findings, patch obligations, or dependency recheck state. Patch identity alone is not patch safety.
+9. Unresolved findings are retryable; terminal verdicts are immutable for the same version/advisory replay scope.
+10. Patch staging preserves old evidence, clears identity proof, increments the version revision, and carries outstanding advisories to the replacement.
+11. Downstream recovery requires every direct dependency to have current identity and aggregate `ACTIVE` state.
+12. Graph size, source responses, history, findings and carried obligations are bounded. Component ordering makes dependency cycles unreachable.
 
-## Core invariants
+## Evidence trust and limits
 
-1. The deployer receives no privileged assessment power.
-2. Project construction is creator-only; identity and advisory assessment are permissionless.
-3. User input can select a bounded GHSA ID but cannot supply an arbitrary evidence URL.
-4. A project cannot seal until every component has exact, current identity proof and the graph contains a dependency edge.
-5. Advisory consensus is bound to component ID, component revision, exact version and exact GHSA ID.
-6. Source failure, malformed identity, model-schema failure or validator disagreement must not optimistically mark a component safe.
-7. A vulnerable component causes deterministic downstream recheck state; dependents are not automatically declared vulnerable.
-8. A patch retires the previous version into history and clears identity proof before the replacement can become active.
-9. Replay protection is version-revision-scoped, allowing the same advisory to be legitimately reassessed after a version change.
-10. Graph writes are bounded and cycles are unreachable because a dependency must have an older component ID than the component that consumes it.
-11. Spatch holds no funds and does not claim to replace professional security review.
+deps.dev provides exact-version identity data. OSV and GitHub Advisory Database provide two structured views of a GHSA, but OSV may derive its entry from GitHub; they are not asserted as independent primary authorities. The independent security check is the custom validator's separate retrieval and semantic re-evaluation. Advisory text is inert input. Spatch does not replace maintainers' emergency response or professional security review.

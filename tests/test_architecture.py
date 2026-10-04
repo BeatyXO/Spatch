@@ -17,7 +17,7 @@ def test_sources_are_constructed_not_user_supplied_urls():
 def test_patch_history_and_revision_scoped_replay_are_explicit():
     assert '"history": []' in SOURCE
     assert 'str(component["version_revision"]) + ":" + advisory_id' in SOURCE
-    assert '"patch_policy": "old-version-history-preserved-new-version-must-be-reverified"' in SOURCE
+    assert '"patch_policy": "identity-is-separate-from-security;' in SOURCE
 
 
 def test_deterministic_blast_radius_is_separate_from_nondeterminism():

@@ -17,9 +17,9 @@ Spatch never accepts arbitrary evidence URLs. It constructs URLs from bounded pa
 - A validator accepts the leader only when decision-critical fields match exactly.
 - Source digests are recorded for auditability but are not treated as permanent identities of mutable web responses.
 
-## Why these sources
+## Trust boundary
 
-deps.dev provides a structured exact-version identity surface. OSV provides machine-readable affected-package/range data. GitHub Advisory Database provides a separate structured advisory representation for the same GHSA object. The combination lets Spatch validate identity deterministically and reserve AI consensus for the genuinely contextual task of applying advisory ranges to locked versions across ecosystems.
+deps.dev provides a structured exact-version identity surface. OSV provides machine-readable affected-package/range data. GitHub Advisory Database provides another structured view of the same GHSA. These are two evidence surfaces, not necessarily two independent upstream authorities: OSV may import or derive its GHSA record from GitHub. The independent work occurs when each custom validator separately fetches both surfaces and re-evaluates applicability; agreement does not remove the shared-source trust limitation.
 
 ## Verified live-lifecycle fixture
 

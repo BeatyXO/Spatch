@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   ArrowDown,
@@ -15,7 +15,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Component, Counts, Edge, parsePositiveInt, Project, statusLabel, statusTone } from './actions';
-import { CHAIN_ID, CONTRACT, configured, connectWallet, explorerAddress, readFinalized, short, txUrl, writeFinalized } from './genlayer';
+import { CHAIN_ID, CONTRACT, configured, connectWallet, explorerAddress, readFinalized, short, txUrl, walletState, writeFinalized } from './genlayer';
 
 const emptyCounts: Counts = { projects: 0, components: 0, edges: 0, assessments: 0 };
 
@@ -38,6 +38,7 @@ function ActionCard({ icon, title, text, children }: { icon: React.ReactNode; ti
 
 export default function App() {
   const [account, setAccount] = useState('');
+  const [wrongNetwork, setWrongNetwork] = useState(false);
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const [lastTx, setLastTx] = useState('');
@@ -46,6 +47,16 @@ export default function App() {
   const [project, setProject] = useState<Project | null>(null);
   const [components, setComponents] = useState<Component[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+
+  useEffect(() => {
+    const provider = window.ethereum as (typeof window.ethereum & { on?: (event: string, listener: () => void) => void; removeListener?: (event: string, listener: () => void) => void }) | undefined;
+    if (!provider?.on) return;
+    const sync = () => { void walletState(provider).then(({ account: next, wrongNetwork: wrong }) => { setAccount(next); setWrongNetwork(wrong); }).catch(() => { setAccount(''); setWrongNetwork(false); }); };
+    provider.on('accountsChanged', sync);
+    provider.on('chainChanged', sync);
+    sync();
+    return () => { provider.removeListener?.('accountsChanged', sync); provider.removeListener?.('chainChanged', sync); };
+  }, []);
 
   const [projectTitle, setProjectTitle] = useState('Production dependency graph');
   const [componentForm, setComponentForm] = useState({ ecosystem: 'pypi', name: 'jinja2', version: '3.1.4' });
@@ -73,7 +84,13 @@ export default function App() {
       if (!nextProject?.id) {
         setProject(null); setComponents([]); setEdges([]); setNotice(`Project ${target} was not found.`); return;
       }
-      const nextComponents = await Promise.all((nextProject.component_ids || []).map((id) => readFinalized<Component>('get_component', [id])));
+      const nextComponents = await Promise.all((nextProject.component_ids || []).map(async (id) => {
+        const [component, findings] = await Promise.all([
+          readFinalized<Component>('get_component', [id]),
+          readFinalized<Component['findings']>('get_findings', [id]),
+        ]);
+        return { ...component, findings };
+      }));
       const nextEdges = await Promise.all((nextProject.edge_ids || []).map((id) => readFinalized<Edge>('get_edge', [id])));
       setProject(nextProject);
       setComponents(nextComponents);
@@ -116,7 +133,7 @@ export default function App() {
           <div><strong>Spatch</strong><small>Security patch intelligence on GenLayer</small></div>
         </div>
         <div className="header-actions">
-          <span className="network"><span className="dot" /> Studionet · {CHAIN_ID}</span>
+          <span className={`network ${wrongNetwork ? 'network-wrong' : ''}`}><span className="dot" /> {wrongNetwork ? 'Wrong wallet network' : `Studionet · ${CHAIN_ID}`}</span>
           <button className="secondary" onClick={onConnect} disabled={!!busy}>{busy === 'connect' ? <LoaderCircle className="spin" size={16} /> : null}{account ? short(account) : 'Connect wallet'}</button>
         </div>
       </header>
@@ -176,6 +193,10 @@ export default function App() {
                     <div className="component-title"><div><small>#{component.id} · {component.ecosystem}</small><h3>{component.name}<span>@{component.version}</span></h3></div><Pill status={component.status} /></div>
                     <p>{statusLabel(component.reason || 'No reason')}</p>
                     <div className="component-meta"><span>state rev {component.revision}</span><span>version rev {component.version_revision}</span><span>verified version rev {component.verified_version_revision || '—'}</span><span>{component.last_advisory_id || 'no advisory'}</span></div>
+                    <div className="component-meta"><span>Identity: {statusLabel(component.identity_status || 'NOT_VERIFIED')}</span><span>Security: {statusLabel(component.findings?.security_status || component.security_status || 'NOT_ASSESSED')}</span></div>
+                    {component.findings?.pending_advisories?.length ? <div className="history"><b>Security reassessment required</b>{component.findings.pending_advisories.map((id) => <span key={id}>{id}</span>)}</div> : null}
+                    {component.findings?.current?.length ? <div className="history"><b>Current version findings · revision {component.version_revision}</b>{component.findings.current.map((finding) => <span key={finding.advisory_id}><Pill status={finding.verdict} /> {finding.advisory_id} · {statusLabel(finding.reason_code)}{finding.fixed_version ? ` · fixed ${finding.fixed_version}` : ''} · assessment {finding.assessment_id} · attempts {finding.attempts}</span>)}</div> : null}
+                    {component.findings?.historical?.length ? <div className="history"><b>Historical version findings</b>{component.findings.historical.map((finding) => <span key={`${finding.version_revision}-${finding.advisory_id}`}>v{finding.version_revision} · <Pill status={finding.verdict} /> {finding.advisory_id} · assessment {finding.assessment_id}</span>)}</div> : null}
                     {component.history?.length > 0 && <div className="history"><b>Retired versions</b>{component.history.map((h, i) => <span key={`${h.version}-${i}`}>{h.version} · {statusLabel(h.status)} {h.advisory_id ? `· ${h.advisory_id}` : ''}</span>)}</div>}
                   </div>
                 </article>

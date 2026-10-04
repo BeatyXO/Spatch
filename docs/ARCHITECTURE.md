@@ -1,58 +1,50 @@
 # Spatch architecture
 
-Spatch is a version-aware dependency security graph for GenLayer. It deliberately separates objective source identity, semantic advisory applicability, and deterministic state propagation.
+Spatch is a bounded, version-aware dependency security graph. It separates package identity, advisory applicability, and deterministic dependency recovery. Identity proves that an exact package version exists; it does not prove security.
 
-## State machine
+## Lifecycle and aggregate state
 
 ```text
-DRAFT PROJECT
-  └─ component PENDING_IDENTITY
-       └─ deps.dev strict identity consensus
-            └─ ACTIVE
-
-all components ACTIVE + at least one dependency edge
-  └─ SEALED PROJECT
-       └─ assess GHSA
-            ├─ AFFECTED      → VULNERABLE → deterministic dependents RECHECK_REQUIRED
-            ├─ NOT_AFFECTED  → ACTIVE
-            └─ UNRESOLVED    → UNRESOLVED / no optimistic safety claim
-
-VULNERABLE / RECHECK_REQUIRED / UNRESOLVED
-  └─ patch_component(new_version)
-       ├─ old version appended to bounded immutable history
-       ├─ current version becomes PATCH_PENDING
-       └─ all identity proof cleared
-            └─ verify_patch
-                 └─ ACTIVE only after exact deps.dev identity proof
-                      └─ same GHSA may be assessed again at the new revision
+DRAFT → exact package identity current → SEALED graph
+  → advisory evidence + independent validator judgment
+  → immutable terminal finding or retryable UNRESOLVED finding
+  → deterministic RECHECK_REQUIRED propagation
+  → creator stages replacement, old version/findings retained in history
+  → replacement identity verified (still SECURITY_REASSESS_REQUIRED)
+  → every carried advisory reassessed for the new version revision
+  → ACTIVE only after security obligations clear
+  → dependent recovery only after all direct dependencies are ACTIVE
 ```
+
+Each finding is bounded and scoped to component ID, `version_revision`, GHSA, verdict, reason, assessment ID, fixed version, and retry attempts. For the current version, aggregate precedence is `VULNERABLE` if any finding is `AFFECTED`, then `UNRESOLVED`, then `SECURITY_REASSESS_REQUIRED` for carried patch obligations, then `RECHECK_REQUIRED`, then `ACTIVE` only when identity is current. A `NOT_AFFECTED` result applies only to its GHSA and cannot clear another finding.
+
+Identity and security are exposed independently (`identity_status`, `verified_version_revision`, `security_status`, and lifecycle `status`). Calling identity verification cannot clear findings or dependency recheck state. `verify_patch` only establishes replacement identity; it never establishes advisory safety.
+
+Terminal AFFECTED/NOT_AFFECTED results are immutable per project/component/version revision/GHSA. UNRESOLVED outcomes remain visible and may be retried; each retry updates the single finding and increments its bounded-in-practice attempt counter. Terminal outcomes cannot be overwritten by an unresolved retry or another result. A real version change creates a new replay scope.
 
 ## Three evidence layers
 
-1. **Component identity** — exact ecosystem/name/version is checked against `api.deps.dev`. This uses strict equality on a canonical structured projection.
-2. **Advisory applicability** — Spatch constructs exact OSV and GitHub Advisory Database URLs from a bounded GHSA identifier. Leader and validators independently fetch both sources and independently judge the exact locked component versions. A custom validator accepts only matching decision-critical projections.
-3. **Blast radius** — after consensus, graph propagation is deterministic. No web or LLM call decides which dependent nodes are traversed.
+1. **Identity:** constructed deps.dev endpoint, strict equality against ecosystem/name/version.
+2. **Applicability:** constructed OSV and GitHub Advisory Database endpoints. Leader and custom validators independently fetch and re-evaluate both records; decision-critical outputs must match exactly. Validator judgment is independent work, while the upstream records are not necessarily independent authorities.
+3. **Blast radius:** deterministic bounded graph traversal after consensus. It does not call a model or network source.
 
-## Why the replay key is revision scoped
+OSV may import or derive a GHSA record from GitHub Advisory Database. The two records are useful structured surfaces, not a claim of two independent primary sources. The independent check is the validator's separate fetch and semantic decision.
 
-The key is:
+## Replay and history
+
+Replay key:
 
 ```text
-project_id : component_id : component_revision : advisory_id
+project_id : component_id : version_revision : advisory_id
 ```
 
-An advisory is not globally burned. If a vulnerable component is replaced with a new version, the component version revision changes and the exact same advisory can be reassessed against the replacement. This is necessary to prove that a patch actually moved the component outside the affected range.
+An unresolved result does not consume a terminal replay key. Staging a patch appends the prior version, lifecycle state, finding references, advisory and assessment IDs to bounded history, increments `version_revision`, clears exact identity proof and carries affected/unresolved advisories into a pending list. Reassessing the same GHSA against the new revision is therefore eligible.
 
-## Why patch history is preserved
+## Bounds
 
-`patch_component` never overwrites the previous security state without trace. It appends the previous version, revision, status, advisory ID, assessment ID and retirement time to a bounded history before changing the current version. The new version then loses all identity proof until it is independently verified.
+- 16 components and 32 edges per project;
+- 8 retired versions per component;
+- 32 findings and 16 carried advisory obligations per component;
+- source-body and user-text limits are explicit in `contracts/spatch.py`.
 
-## Boundedness
-
-- max components per project: 16
-- max dependency edges per project: 32
-- max retired versions per component: 8
-- source bodies: 180 KB maximum
-- user text and version fields are bounded
-
-These limits keep traversal and storage growth explicit and reviewer-auditable.
+Dependencies must point from a later-created dependent to an earlier-created dependency, making cycles unreachable by construction.
