@@ -90,7 +90,7 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
     direct_vm.sender = direct_bob
     assessment_id = int(contract.assess_advisory(project_id, GHSA))
     assessment = contract.get_assessment(assessment_id)
-    assert assessment["status"] == "ASSESSED", assessment
+    assert assessment["status"] == "ASSESSED", assessment.get("diagnostic_detail", assessment)
     assert direct_vm.run_validator() is True
     conflicting = json.dumps({"kind": "ASSESSED", "advisory_id": GHSA, "results": [
         row(dep_id, dep["revision"], dep["version_revision"], "NOT_AFFECTED", "PACKAGE_NOT_TARGETED"),
@@ -174,7 +174,7 @@ def test_direct_malformed_model_output_fails_closed(direct_deploy, direct_vm, di
     assessment_id = int(contract.assess_advisory(project_id, GHSA))
     assessment = contract.get_assessment(assessment_id)
     assert assessment["status"] == "UNRESOLVED"
-    assert assessment["reason"] == "MODEL_SCHEMA_INVALID"
+    assert assessment["reason"] == "MODEL_SCHEMA_INVALID", assessment.get("diagnostic_detail", assessment)
     assert contract.get_component(dep_id)["status"] == "ACTIVE"
 
 

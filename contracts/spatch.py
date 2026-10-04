@@ -576,6 +576,7 @@ class Spatch(gl.Contract):
                     "kind": UNRESOLVED,
                     "reason": "ADVISORY_SOURCE_OR_MODEL_FAILURE",
                     "diagnostic": type(exc).__name__[:64],
+                    "diagnostic_detail": clean_text(str(exc))[:240],
                 })
 
         def validator(leader_result):
@@ -603,6 +604,7 @@ class Spatch(gl.Contract):
             "status": consensus.get("kind", UNRESOLVED),
             "reason": consensus.get("reason", ""),
             "diagnostic": consensus.get("diagnostic", ""),
+            "diagnostic_detail": consensus.get("diagnostic_detail", ""),
             "source_digest": consensus.get("source_digest", ""),
             "results": consensus.get("results", []),
         })
