@@ -45,14 +45,14 @@ Views: `get_project`, `get_component`, `get_edge`, `get_assessment`, `get_findin
 
 See [architecture](docs/ARCHITECTURE.md), [threat model](docs/THREAT_MODEL.md), [source manifest](docs/SOURCE_MANIFEST.md), and [verification status](docs/VERIFICATION.md).
 
-## Historical deployment and current status
+## Current canonical deployment
 
-- Network: GenLayer Studionet, chain ID **61999**.
-- Previous contract [`0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1`](https://explorer-studio.genlayer.com/address/0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1) is historical and predates the current security-state refactor.
-- Current canonical contract: [`0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`](https://explorer-studio.genlayer.com/address/0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39), deployed to Studionet chain ID 61999 with source/schema verified and fresh two-wallet lifecycle passed.
-- Production frontend URL: not deployed; the project owner will build and deploy it with the configured contract address.
-- Production build environment: `VITE_CONTRACT_ADDRESS=0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`.
-- Current and historical finalized transaction evidence are in [live evidence](docs/LIVE_EVIDENCE.md).
+- Network: **GenLayer Studionet**, chain ID **61999**.
+- Canonical contract: [`0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`](https://explorer-studio.genlayer.com/address/0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39).
+- Deployment transaction: [`0x6704d8c446543fa1b2d635ae113ebb4f1de5cd5ca2f1a400fbac4232c158c380`](https://explorer-studio.genlayer.com/tx/0x6704d8c446543fa1b2d635ae113ebb4f1de5cd5ca2f1a400fbac4232c158c380).
+- Source/schema verification and the fresh two-wallet lifecycle are recorded in [live evidence](docs/LIVE_EVIDENCE.md).
+- Production frontend URL: not deployed; build with `VITE_CONTRACT_ADDRESS=0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`.
+- Superseded deployment evidence is retained only for auditability in [historical evidence](docs/HISTORICAL_EVIDENCE.md).
 
 ## Local checks
 
