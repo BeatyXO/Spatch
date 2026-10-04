@@ -9,7 +9,6 @@
 import { createAccount, createClient } from '../frontend/node_modules/genlayer-js/dist/index.js';
 import { studionet } from '../frontend/node_modules/genlayer-js/dist/chains/index.js';
 import {
-  ExecutionResult,
   TransactionHashVariant,
   TransactionStatus,
 } from '../frontend/node_modules/genlayer-js/dist/types/index.js';
@@ -51,8 +50,12 @@ async function write(client, account, label, name, args) {
     interval: 3000,
     retries: 240,
   });
-  if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
-    throw new Error(`${label} finalized with ${receipt.txExecutionResultName || 'no execution result'}`);
+  const receiptStatus = receipt.status_name || receipt.statusName;
+  const leaderExecution = receipt.consensus_data?.leader_receipt?.find(
+    (entry) => entry.mode === 'leader',
+  )?.execution_result;
+  if (receiptStatus !== 'FINALIZED' || leaderExecution !== 'SUCCESS') {
+    throw new Error(`${label} finalized with ${leaderExecution || 'no leader execution result'} (${receiptStatus || 'unknown status'})`);
   }
   console.log(`${label}.finalized=${hash}`);
   return hash;
