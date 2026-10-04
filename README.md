@@ -35,8 +35,9 @@ The important detail is the final step. Replay protection is scoped to `project:
 - `assess_advisory(project_id, advisory_id)`
 - `patch_component(component_id, new_version, expected_revision)`
 - `verify_patch(component_id, expected_revision)`
+- `reassess_dependency(component_id, expected_revision)`
 
-Views: `get_project`, `get_component`, `get_edge`, `get_assessment`, `get_counts`, `get_protocol`.
+Views: `get_project`, `get_component`, `get_edge`, `get_assessment`, `get_findings`, `get_security_findings`, `get_counts`, `get_protocol`.
 
 ## Evidence model
 
@@ -44,19 +45,19 @@ Views: `get_project`, `get_component`, `get_edge`, `get_assessment`, `get_counts
 
 See [architecture](docs/ARCHITECTURE.md), [threat model](docs/THREAT_MODEL.md), [source manifest](docs/SOURCE_MANIFEST.md), and [verification status](docs/VERIFICATION.md).
 
-## Final deployment
+## Historical deployment and current status
 
 - Network: GenLayer Studionet, chain ID **61999**.
-- Contract: [`0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1`](https://explorer-studio.genlayer.com/address/0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1).
-- Frontend production URL: not yet deployed. The project owner is deploying it.
-- Production build environment: `VITE_CONTRACT_ADDRESS=0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1`.
-- Finalized two-wallet lifecycle evidence and transaction hashes are in [live evidence](docs/LIVE_EVIDENCE.md).
+- Previous contract [`0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1`](https://explorer-studio.genlayer.com/address/0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1) is historical and predates the current security-state refactor.
+- Current-source deployment on Studionet chain ID 61999 is pending Direct Mode lifecycle validation. The canonical address is intentionally unset in `deployments/studionet.json`.
+- Production frontend URL: not deployed; the project owner will deploy it after the new address is available.
+- Historical finalized two-wallet evidence is labeled in [live evidence](docs/LIVE_EVIDENCE.md).
 
 ## Local checks
 
 ```bash
 python -m pytest tests -q
-# 15 lightweight tests pass
+# 19 lightweight tests pass
 
 pip install genvm-linter
 genvm-lint check contracts/spatch.py
@@ -67,7 +68,7 @@ npm test
 npm run build
 ```
 
-The official GenLayer Direct Mode suite (8 cases), frontend checks, and GenVM checks run in [GitHub Actions](https://github.com/BeatyXO/Spatch/actions/runs/37223117765). Final counts and platform-specific limitations are in [verification status](docs/VERIFICATION.md).
+The official GenLayer Direct Mode suite, frontend checks, and GenVM checks run in [GitHub Actions](https://github.com/BeatyXO/Spatch/actions). Current counts and platform-specific limitations are in [verification status](docs/VERIFICATION.md).
 
 ## Frontend direction
 
@@ -75,7 +76,7 @@ The frontend is intentionally distinctive but readable: layered **shades of blue
 
 ## Deployment status
 
-The Studionet contract is deployed and verified. Frontend production hosting remains for the project owner; set `VITE_CONTRACT_ADDRESS` to the contract address above. Browser-wallet E2E is not claimed because no injected wallet is available in the connected browser environment.
+The current source is not deployed. Frontend production hosting remains for the project owner; set `VITE_CONTRACT_ADDRESS` to the future verified contract address. Browser-wallet E2E is not claimed because no injected wallet is available in the connected browser environment.
 
 ## Verified advisory fixture
 

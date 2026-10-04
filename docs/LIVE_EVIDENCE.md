@@ -1,6 +1,8 @@
-# Studionet live evidence
+# Historical Studionet live evidence (pre-refactor)
 
-**Result: lifecycle PASS on GenLayer Studionet, chain ID 61999.** Evidence below was read from finalized transactions on 2026-10-04 against the fresh final deployment. Author and observer were separate wallets; the deployer was a third wallet.
+> **Historical only.** This lifecycle ran against contract `0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1`, deployed from the pre-refactor source at commit `3cb79e250965aace51cce14efa7f8369974f49c3`. The security-state model has since changed. This address does **not** contain the current implementation and must not be presented as the canonical deployment. A fresh Studionet deployment and lifecycle have not yet been verified.
+
+**Historical result: lifecycle PASS on GenLayer Studionet, chain ID 61999 for the pre-refactor contract only.** Evidence below was read from finalized transactions on 2026-10-04. It is not evidence for the current source. Author and observer were separate wallets; the deployer was a third wallet.
 
 ## Deployment identity
 

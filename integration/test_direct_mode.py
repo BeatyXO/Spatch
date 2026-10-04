@@ -139,10 +139,8 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
 
     direct_vm.clear_mocks()
     advisory_sources(direct_vm)
-    app = contract.get_component(app_id)
     direct_vm.mock_llm(".*", judgment([
         row(dep_id, patched["revision"], patched["version_revision"], "NOT_AFFECTED", "VERSION_OUTSIDE_AFFECTED_RANGE", "3.1.5"),
-        row(app_id, app["revision"], app["version_revision"], "NOT_AFFECTED", "PACKAGE_NOT_TARGETED"),
     ]))
     next_assessment = int(contract.assess_advisory(project_id, GHSA))
     assert next_assessment > assessment_id
