@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertSuccessfulWrite, parsePositiveInt, statusLabel, statusTone } from './actions';
+import { assertSuccessfulWrite, decodeGenVmReturn, isSuccessfulExecutionResult, parsePositiveInt, statusLabel, statusTone } from './actions';
 
 describe('presentation helpers', () => {
   it('formats contract states for humans', () => {
@@ -26,5 +26,17 @@ describe('presentation helpers', () => {
     expect(() => assertSuccessfulWrite('create_project', { status: 'return', payload: { readable: '1' } })).not.toThrow();
     expect(() => assertSuccessfulWrite('seal_project', { status: 'return', payload: { readable: '"SEALED"' } })).not.toThrow();
     expect(() => assertSuccessfulWrite('add_component', { status: 'return', payload: { readable: '"ONLY_PROJECT_CREATOR"' } })).toThrow(/ONLY_PROJECT_CREATOR/);
+  });
+
+  it('decodes Studionet GenVM return values before validating writes', () => {
+    expect(decodeGenVmReturn('ABk=')).toEqual({ status: 'return', payload: { readable: '3' } });
+    expect(() => assertSuccessfulWrite('add_component', 'ABk=')).not.toThrow();
+  });
+
+  it('accepts the stable SDK receipt and the Studionet leader receipt formats', () => {
+    expect(isSuccessfulExecutionResult('FINISHED_WITH_RETURN')).toBe(true);
+    expect(isSuccessfulExecutionResult(undefined, 'SUCCESS')).toBe(true);
+    expect(isSuccessfulExecutionResult(undefined, 'ERROR')).toBe(false);
+    expect(isSuccessfulExecutionResult('FINISHED_WITH_ERROR', 'SUCCESS')).toBe(false);
   });
 });

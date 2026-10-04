@@ -1,3 +1,5 @@
+import { abi } from 'genlayer-js';
+
 export type Counts = { projects: number; components: number; edges: number; assessments: number };
 export type Project = {
   id: number;
@@ -66,11 +68,36 @@ export function parsePositiveInt(value: string, label: string) {
 }
 
 export function decodeContractReturn(value: unknown): unknown {
+  if (typeof value === 'string') value = decodeGenVmReturn(value);
   if (!value || typeof value !== 'object') return value;
   const result = value as { status?: unknown; payload?: { readable?: unknown } };
   if (result.status !== 'return' || typeof result.payload?.readable !== 'string') return value;
   try { return JSON.parse(result.payload.readable); }
   catch { return result.payload.readable; }
+}
+
+/** Decode the base64 GenVM result used by the current Studionet consensus API. */
+export function decodeGenVmReturn(value: string): unknown {
+  try {
+    const bytes = Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+    if (bytes.length < 1) return value;
+    const code = bytes[0];
+    if (code === 0) {
+      const decoded = abi.calldata.decode(bytes.slice(1));
+      return { status: 'return', payload: { readable: abi.calldata.toString(decoded) } };
+    }
+    const status = ({ 1: 'rollback', 2: 'contract_error', 3: 'error', 4: 'none', 5: 'no_leaders' } as Record<number, string>)[code];
+    return status ? { status, payload: null } : value;
+  } catch {
+    return value;
+  }
+}
+
+export function isSuccessfulExecutionResult(receiptResult?: string, leaderResult?: string) {
+  const leader = leaderResult?.toUpperCase();
+  if (receiptResult === 'FINISHED_WITH_ERROR' || leader === 'ERROR') return false;
+  if (receiptResult) return receiptResult === 'FINISHED_WITH_RETURN';
+  return leader === 'SUCCESS';
 }
 
 export function assertSuccessfulWrite(functionName: string, rawResult: unknown) {

@@ -1,7 +1,7 @@
 import { createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
 import { ExecutionResult, TransactionHash, TransactionHashVariant, TransactionStatus } from 'genlayer-js/types';
-import { assertSuccessfulWrite } from './actions';
+import { assertSuccessfulWrite, decodeContractReturn, isSuccessfulExecutionResult } from './actions';
 
 type Provider = NonNullable<Window['ethereum']> & {
   on?: (event: string, listener: (...args: unknown[]) => void) => void;
@@ -110,16 +110,18 @@ export async function writeFinalized(expectedAccount: string, functionName: stri
     hash: hash as TransactionHash,
     status: TransactionStatus.FINALIZED,
   } as never) as Awaited<ReturnType<typeof client.waitForTransactionReceipt>> & {
-    consensus_data?: { leader_receipt?: Array<{ mode?: string; result?: unknown }> };
+    consensus_data?: { leader_receipt?: Array<{ mode?: string; execution_result?: string; result?: unknown }> };
   };
-  if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
-    throw new FinalizedWriteError(`Transaction finalized with ${receipt.txExecutionResultName || 'no execution result'}.`, hash);
-  }
   const leaderReceipt = receipt.consensus_data?.leader_receipt?.find((entry) => entry.mode === 'leader');
   if (!leaderReceipt) {
     throw new FinalizedWriteError('Transaction finalized, but its leader return value is missing; verify finalized contract state before assuming success.', hash);
   }
-  try { assertSuccessfulWrite(functionName, leaderReceipt.result); }
+  const leaderExecutionResult = leaderReceipt.execution_result?.toUpperCase();
+  if (!isSuccessfulExecutionResult(receipt.txExecutionResultName, leaderExecutionResult)) {
+    const result = receipt.txExecutionResultName || leaderExecutionResult || 'unknown execution result';
+    throw new FinalizedWriteError(`Transaction finalized with ${result}.`, hash);
+  }
+  try { assertSuccessfulWrite(functionName, decodeContractReturn(leaderReceipt.result)); }
   catch (error) {
     throw new FinalizedWriteError(error instanceof Error ? error.message : String(error), hash);
   }
