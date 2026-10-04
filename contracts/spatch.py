@@ -664,7 +664,12 @@ class Spatch(gl.Contract):
                     return canon({"kind": UNRESOLVED, "reason": "MODEL_TOP_LEVEL_SCHEMA_INVALID"})
                 rows = result.get("results")
                 if type(rows) is not list or len(rows) != len(candidates):
-                    return canon({"kind": UNRESOLVED, "reason": "MODEL_RESULT_COUNT_INVALID"})
+                    actual_count = len(rows) if type(rows) is list else -1
+                    return canon({
+                        "kind": UNRESOLVED,
+                        "reason": "MODEL_RESULT_COUNT_INVALID",
+                        "diagnostic": str(actual_count) + ":" + str(len(candidates)),
+                    })
                 allowed_v = (AFFECTED, NOT_AFFECTED, UNRESOLVED)
                 allowed_r = (
                     "VERSION_IN_AFFECTED_RANGE",
