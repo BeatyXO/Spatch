@@ -41,7 +41,7 @@ const read = (name, args = []) => reader.readContract({
   jsonSafeReturn: true,
 });
 
-async function write(client, account, label, name, args) {
+async function write(client, account, label, name, args, expectedReturn) {
   const hash = await client.writeContract({ address: contractAddress, functionName: name, args, value: 0n });
   console.log(`${label}.submitted=${hash}`);
   const receipt = await client.waitForTransactionReceipt({
@@ -54,8 +54,16 @@ async function write(client, account, label, name, args) {
   const leaderExecution = receipt.consensus_data?.leader_receipt?.find(
     (entry) => entry.mode === 'leader',
   )?.execution_result;
+  const leaderReturn = decodeLeaderReturn(receipt.consensus_data?.leader_receipt?.find(
+    (entry) => entry.mode === 'leader',
+  )?.result);
   if (receiptStatus !== 'FINALIZED' || leaderExecution !== 'SUCCESS') {
     throw new Error(`${label} finalized with ${leaderExecution || 'no leader execution result'} (${receiptStatus || 'unknown status'})`);
+  }
+  if (expectedReturn !== undefined) {
+    assert(String(leaderReturn) === expectedReturn, `${label} contract return`, leaderReturn);
+  } else if (typeof leaderReturn === 'string' && !/^\d+$/.test(leaderReturn) && !['SEALED', 'PATCH_VERSION_STAGED'].includes(leaderReturn)) {
+    throw new Error(`${label} finalized without changing state: ${leaderReturn}`);
   }
   console.log(`${label}.finalized=${hash}`);
   return hash;
@@ -66,12 +74,21 @@ function assert(ok, label, data) {
   console.log(`${label}.readback=${JSON.stringify(data)}`);
 }
 
+function decodeLeaderReturn(value) {
+  if (value && typeof value === 'object' && value.status === 'return') {
+    const readable = value.payload?.readable;
+    if (typeof readable !== 'string') return value;
+    try { return JSON.parse(readable); } catch { return readable; }
+  }
+  return value;
+}
+
 const protocol = await read('get_protocol');
 assert(Number(protocol.chain_id) === 61999 && protocol.name === 'Spatch', 'protocol', protocol);
 const initial = await read('get_counts');
 const resume = process.env.SPATCH_RESUME === '1';
 if (!resume) assert(Number(initial.projects) === 0 && Number(initial.components) === 0, 'fresh deployment', initial);
-else assert(Number(initial.projects) === 1 && Number(initial.components) === 2, 'resume existing live fixture', initial);
+else assert(Number(initial.projects) === 1 && [0, 2].includes(Number(initial.components)), 'resume known live checkpoint', initial);
 
 let projectId;
 let dependencyId;
@@ -80,10 +97,47 @@ let counts;
 let dep;
 let app;
 let project;
+if (resume && Number(initial.components) === 2) {
+  projectId = Number(initial.projects);
+  project = await read('get_project', [projectId]);
+  [dependencyId, appId] = project.component_ids.map(Number);
+  dep = await read('get_component', [dependencyId]);
+  app = await read('get_component', [appId]);
+  assert(project.status === 'SEALED' && Number(dep.version_revision) === 2 && dep.status === 'ACTIVE' && app.status === 'RECHECK_REQUIRED', 'resume after finalized patched reassessment', { project, dep, app });
+  const findings = await read('get_findings', [dependencyId]);
+  assert(findings.current.some((f) => f.verdict === 'NOT_AFFECTED' && f.advisory_id === process.env.SPATCH_GHSA.toUpperCase()) && findings.historical.some((f) => f.verdict === 'AFFECTED' && f.advisory_id === process.env.SPATCH_GHSA.toUpperCase()), 'resume finding history', findings);
+  const unchangedApp = JSON.stringify(app);
+  await write(observerClient, observer, 'identity_cannot_clear_recheck', 'verify_component', [appId, Number(app.revision)], 'COMPONENT_IDENTITY_ALREADY_CURRENT');
+  app = await read('get_component', [appId]);
+  assert(JSON.stringify(app) === unchangedApp && app.status === 'RECHECK_REQUIRED', 'identity verification cannot clear downstream recheck', app);
+  await write(observerClient, observer, 'clear_downstream_recheck', 'reassess_dependency', [appId, Number(app.revision)]);
+  app = await read('get_component', [appId]);
+  assert(app.status === 'ACTIVE', 'downstream recovery', app);
+  project = await read('get_project', [projectId]);
+  counts = await read('get_counts');
+  assert(Number(counts.projects) === 1 && Number(counts.components) === 2 && Number(counts.edges) === 1 && Number(counts.assessments) === 6, 'final graph counts', counts);
+  const edge = await read('get_edge', [Number(project.edge_ids[0])]);
+  const assessments = [];
+  for (let id = 1; id <= Number(counts.assessments); id++) assessments.push(await read('get_assessment', [id]));
+  console.log(`e2e.final.project=${JSON.stringify(project)}`);
+  console.log(`e2e.final.dependency=${JSON.stringify(dep)}`);
+  console.log(`e2e.final.app=${JSON.stringify(app)}`);
+  console.log(`e2e.final.edge=${JSON.stringify(edge)}`);
+  console.log(`e2e.final.counts=${JSON.stringify(counts)}`);
+  console.log(`e2e.final.findings=${JSON.stringify(findings)}`);
+  console.log(`e2e.final.assessments=${JSON.stringify(assessments)}`);
+  console.log('e2e.result=PASS');
+} else {
 if (!resume) {
 await write(authorClient, author, 'create_project', 'create_project', ['Spatch live evidence fixture']);
 counts = await read('get_counts');
 projectId = Number(counts.projects);
+} else {
+  counts = initial;
+  projectId = Number(counts.projects);
+  project = await read('get_project', [projectId]);
+  assert(project.status === 'DRAFT' && project.component_ids.length === 0, 'resumable empty draft', project);
+}
 dependencyId = Number(counts.components) + 1;
 appId = dependencyId + 1;
 
@@ -94,7 +148,7 @@ await write(observerClient, observer, 'unauthorized_add_component', 'add_compone
   process.env.SPATCH_DEP_ECOSYSTEM,
   'spatch-unauthorized-probe',
   '0.0.1',
-]);
+], 'ONLY_PROJECT_CREATOR');
 counts = await read('get_counts');
 assert(Number(counts.components) === Number(beforeUnauthorizedEdit.components), 'creator-only mutation', counts);
 
@@ -115,7 +169,7 @@ const beforeStaleAttempt = dep;
 await write(observerClient, observer, 'stale_identity_revision', 'verify_component', [
   dependencyId,
   Math.max(0, Number(dep.revision) - 1),
-]);
+], 'STALE_COMPONENT_REVISION');
 dep = await read('get_component', [dependencyId]);
 assert(
   Number(dep.revision) === Number(beforeStaleAttempt.revision) && dep.status === beforeStaleAttempt.status,
@@ -128,10 +182,6 @@ project = await read('get_project', [projectId]);
 assert(project.status === 'SEALED', 'sealed graph', project);
 
 await write(observerClient, observer, 'assess_vulnerable_version', 'assess_advisory', [projectId, process.env.SPATCH_GHSA]);
-}
-projectId ??= 1;
-dependencyId ??= 1;
-appId ??= 2;
 counts = await read('get_counts');
 const liveAssessment = await read('get_assessment', [Number(counts.assessments)]);
 assert(liveAssessment.status === 'ASSESSED', 'advisory source and validator result', liveAssessment);
@@ -142,6 +192,8 @@ const vulnerableAssessment = await read('get_assessment', [Number(dep.last_asses
 const vulnerableResult = vulnerableAssessment.results?.find(
   (result) => Number(result.component_id) === dependencyId,
 );
+const vulnerableFindings = await read('get_findings', [dependencyId]);
+assert(vulnerableFindings.current.some((finding) => finding.advisory_id === process.env.SPATCH_GHSA.toUpperCase() && finding.verdict === 'AFFECTED' && Number(finding.version_revision) === Number(dep.version_revision)), 'advisory-scoped vulnerable finding', vulnerableFindings);
 assert(
   vulnerableAssessment.advisory_id === process.env.SPATCH_GHSA.toUpperCase() && vulnerableResult &&
     vulnerableResult.verdict === 'AFFECTED' &&
@@ -153,7 +205,7 @@ assert(
 // Same version revision must be replay-blocked without creating another assessment.
 counts = await read('get_counts');
 const stateBeforeReplay = { status: dep.status, revision: Number(dep.revision), lastAssessment: Number(dep.last_assessment_id) };
-await write(observerClient, observer, 'replay_same_version', 'assess_advisory', [projectId, process.env.SPATCH_GHSA]);
+await write(observerClient, observer, 'replay_same_version', 'assess_advisory', [projectId, process.env.SPATCH_GHSA], 'ADVISORY_ALREADY_ASSESSED_FOR_CURRENT_REVISIONS');
 const afterReplay = await read('get_counts');
 assert(Number(afterReplay.assessments) === Number(counts.assessments), 'same-version replay blocked', afterReplay);
 dep = await read('get_component', [dependencyId]);
@@ -168,7 +220,7 @@ const appBeforeBlockedRecovery = app;
 await write(observerClient, observer, 'blocked_downstream_recovery', 'reassess_dependency', [
   appId,
   Number(app.revision),
-]);
+], 'UPSTREAM_STILL_VULNERABLE');
 app = await read('get_component', [appId]);
 assert(
   app.status === 'RECHECK_REQUIRED' && Number(app.revision) === Number(appBeforeBlockedRecovery.revision),
@@ -187,7 +239,9 @@ assert(
 );
 await write(observerClient, observer, 'verify_patch_identity', 'verify_patch', [dependencyId, Number(dep.revision)]);
 dep = await read('get_component', [dependencyId]);
-assert(dep.status === 'ACTIVE', 'patch identity current', dep);
+assert(dep.status === 'SECURITY_REASSESS_REQUIRED' && Number(dep.verified_version_revision) === Number(dep.version_revision) && dep.identity_evidence_digest, 'patch identity does not claim security safety', dep);
+const afterPatchIdentityFindings = await read('get_findings', [dependencyId]);
+assert(afterPatchIdentityFindings.pending_advisories.includes(process.env.SPATCH_GHSA.toUpperCase()), 'patch keeps original advisory obligation', afterPatchIdentityFindings);
 
 await write(observerClient, observer, 'reassess_same_ghsa_new_version', 'assess_advisory', [projectId, process.env.SPATCH_GHSA]);
 dep = await read('get_component', [dependencyId]);
@@ -205,6 +259,8 @@ assert(
   'same GHSA reassessed only for new version revision',
   patchedAssessment,
 );
+const finalFindings = await read('get_findings', [dependencyId]);
+assert(finalFindings.current.some((finding) => finding.advisory_id === process.env.SPATCH_GHSA.toUpperCase() && finding.verdict === 'NOT_AFFECTED') && finalFindings.historical.some((finding) => finding.advisory_id === process.env.SPATCH_GHSA.toUpperCase() && finding.verdict === 'AFFECTED'), 'current and retired version findings preserved', finalFindings);
 
 app = await read('get_component', [appId]);
 await write(observerClient, observer, 'clear_downstream_recheck', 'reassess_dependency', [appId, Number(app.revision)]);
@@ -213,8 +269,8 @@ assert(app.status === 'ACTIVE', 'downstream recovery', app);
 
 project = await read('get_project', [projectId]);
 counts = await read('get_counts');
-assert(Number(counts.projects) === 1 && Number(counts.components) === 2 && Number(counts.edges) === 1, 'final graph counts', counts);
-const edge = await read('get_edge', [1]);
+assert(Number(counts.projects) === Number(initial.projects) + (resume ? 0 : 1) && Number(counts.components) === Number(initial.components) + 2 && Number(counts.edges) === Number(initial.edges) + 1, 'final graph counts', counts);
+const edge = await read('get_edge', [Number(project.edge_ids[0])]);
 const assessments = [];
 for (let id = 1; id <= Number(counts.assessments); id++) assessments.push(await read('get_assessment', [id]));
 console.log(`e2e.final.project=${JSON.stringify(project)}`);
@@ -222,5 +278,7 @@ console.log(`e2e.final.dependency=${JSON.stringify(dep)}`);
 console.log(`e2e.final.app=${JSON.stringify(app)}`);
 console.log(`e2e.final.edge=${JSON.stringify(edge)}`);
 console.log(`e2e.final.counts=${JSON.stringify(counts)}`);
+console.log(`e2e.final.findings=${JSON.stringify(finalFindings)}`);
 console.log(`e2e.final.assessments=${JSON.stringify(assessments)}`);
 console.log('e2e.result=PASS');
+}

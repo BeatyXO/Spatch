@@ -49,9 +49,10 @@ See [architecture](docs/ARCHITECTURE.md), [threat model](docs/THREAT_MODEL.md), 
 
 - Network: GenLayer Studionet, chain ID **61999**.
 - Previous contract [`0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1`](https://explorer-studio.genlayer.com/address/0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1) is historical and predates the current security-state refactor.
-- Current-source deployment on Studionet chain ID 61999 is pending Direct Mode lifecycle validation. The canonical address is intentionally unset in `deployments/studionet.json`.
-- Production frontend URL: not deployed; the project owner will deploy it after the new address is available.
-- Historical finalized two-wallet evidence is labeled in [live evidence](docs/LIVE_EVIDENCE.md).
+- Current canonical contract: [`0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`](https://explorer-studio.genlayer.com/address/0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39), deployed to Studionet chain ID 61999 with source/schema verified and fresh two-wallet lifecycle passed.
+- Production frontend URL: not deployed; the project owner will build and deploy it with the configured contract address.
+- Production build environment: `VITE_CONTRACT_ADDRESS=0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`.
+- Current and historical finalized transaction evidence are in [live evidence](docs/LIVE_EVIDENCE.md).
 
 ## Local checks
 
@@ -76,7 +77,7 @@ The frontend is intentionally distinctive but readable: layered **shades of blue
 
 ## Deployment status
 
-The current source is not deployed. Frontend production hosting remains for the project owner; set `VITE_CONTRACT_ADDRESS` to the future verified contract address. Browser-wallet E2E is not claimed because no injected wallet is available in the connected browser environment.
+The current contract is deployed and verified. Frontend production hosting remains for the project owner; set `VITE_CONTRACT_ADDRESS` to the address above. Browser-wallet E2E is not claimed because no injected wallet is available in the connected browser environment.
 
 ## Verified advisory fixture
 
