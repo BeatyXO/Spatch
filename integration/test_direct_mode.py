@@ -5,6 +5,7 @@ import json
 import pytest
 
 GHSA = "GHSA-GMJ6-6F8F-6699"
+OSV_GHSA = "GHSA-" + GHSA[5:].lower()
 
 
 def web_json(vm, pattern, value, status=200):
@@ -18,7 +19,7 @@ def identity(vm, name, version):
 
 
 def advisory_sources(vm):
-    web_json(vm, rf"api\.osv\.dev/v1/vulns/{GHSA.lower()}", {
+    web_json(vm, rf"api\.osv\.dev/v1/vulns/{OSV_GHSA}", {
         "id": GHSA,
         "affected": [{
             "package": {"ecosystem": "PyPI", "name": "jinja2"},
@@ -188,7 +189,7 @@ def test_direct_advisory_source_failures_fail_closed(
     contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
     project_id, dep_id, app_id = draft(contract, direct_vm, direct_alice)
     verified_sealed(contract, direct_vm, project_id, dep_id, app_id, direct_bob)
-    direct_vm.mock_web(rf"api\.osv\.dev/v1/vulns/{GHSA.lower()}", source_response)
+    direct_vm.mock_web(rf"api\.osv\.dev/v1/vulns/{OSV_GHSA}", source_response)
     web_json(direct_vm, rf"api\.github\.com/advisories/{GHSA}", {
         "ghsa_id": GHSA,
         "summary": "Jinja sandbox breakout through malicious filenames",
