@@ -1,6 +1,7 @@
 import { createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
 import { ExecutionResult, TransactionHash, TransactionHashVariant, TransactionStatus } from 'genlayer-js/types';
+import { assertSuccessfulWrite } from './actions';
 
 type Provider = NonNullable<Window['ethereum']> & {
   on?: (event: string, listener: (...args: unknown[]) => void) => void;
@@ -78,10 +79,7 @@ export async function writeFinalized(expectedAccount: string, functionName: stri
   if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
     throw new Error(`Transaction finalized with ${receipt.txExecutionResultName || 'no execution result'}.`);
   }
-  const contractResult = receipt.consensus_data?.leader_receipt?.[0]?.result;
-  if (typeof contractResult === 'string' && /^(ONLY_PROJECT_CREATOR|PROJECT_NOT_FOUND|PROJECT_NOT_DRAFT|PROJECT_NOT_SEALED|COMPONENT_NOT_FOUND|EDGE_NOT_FOUND|STALE_COMPONENT_REVISION|STALE_PROJECT_REVISION|INVALID_|UNSUPPORTED_ECOSYSTEM|COMPONENT_LIMIT|EDGE_LIMIT|COMPONENT_ORDER_INVALID|DEPENDENCY_ORDER_INVALID|DEPENDENCY_ALREADY_EXISTS|COMPONENT_IDENTITY_NOT_CURRENT|COMPONENT_IDENTITY_ALREADY_CURRENT|COMPONENT_NOT_PATCHABLE|PATCH_NOT_PENDING|UPSTREAM_STILL_VULNERABLE|UPSTREAM_NOT_STABLE|ADVISORY_ALREADY_ASSESSED|FINDING_LIMIT|PENDING_ADVISORY_LIMIT|VERSION_HISTORY_LIMIT|COMPONENT_NOT_RECHECK_REQUIRED|NO_DEPENDENCIES)/.test(contractResult)) {
-    throw new Error(`${functionName} finalized without changing state: ${contractResult}.`);
-  }
+  assertSuccessfulWrite(functionName, receipt.consensus_data?.leader_receipt?.[0]?.result);
   return hash;
 }
 

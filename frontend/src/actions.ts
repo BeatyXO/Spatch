@@ -64,3 +64,10 @@ export function parsePositiveInt(value: string, label: string) {
   if (!Number.isInteger(n) || n < 1) throw new Error(`${label} must be a positive integer.`);
   return n;
 }
+
+export function assertSuccessfulWrite(functionName: string, result: unknown) {
+  if (typeof result !== 'string' || /^\d+$/.test(result)) return;
+  const expected = functionName === 'seal_project' ? 'SEALED' : functionName === 'patch_component' ? 'PATCH_VERSION_STAGED' : '';
+  if (expected && result === expected) return;
+  throw new Error(`${functionName} finalized without changing state: ${result}.`);
+}

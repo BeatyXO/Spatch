@@ -41,7 +41,7 @@ Views: `get_project`, `get_component`, `get_edge`, `get_assessment`, `get_findin
 
 ## Evidence model
 
-**deps.dev** is used for exact component identity. **OSV** and the **GitHub Advisory Database** are both fetched for a GHSA assessment. User input never supplies source URLs. Advisory descriptions are treated as inert evidence. A custom GenLayer validator independently re-runs the source fetch + semantic judgment and accepts only matching decision-critical projections.
+**deps.dev** is used for exact component identity. **OSV** and the **GitHub Advisory Database** are both fetched for a GHSA assessment. They are separate structured evidence surfaces, not necessarily independent upstream authorities because OSV can derive/import GHSA data from GitHub. User input never supplies source URLs. Advisory descriptions are inert evidence. A custom GenLayer validator independently re-fetches and re-evaluates applicability, accepting only matching decision-critical projections.
 
 See [architecture](docs/ARCHITECTURE.md), [threat model](docs/THREAT_MODEL.md), [source manifest](docs/SOURCE_MANIFEST.md), and [verification status](docs/VERIFICATION.md).
 

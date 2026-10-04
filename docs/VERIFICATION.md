@@ -5,10 +5,10 @@ Status after the security-state refactor. Historical deployment evidence applies
 ## Current checks
 
 - Lightweight contract/architecture suite: `python -m pytest tests -q` — **19 passed** locally.
-- GenVM lint and SDK/schema validation passed on Linux CI through commit `f1aff49`; that run's Direct Mode job failed. The latest pushed commit `e008b24` adds bounded result-count diagnostics; CI is pending.
+- GenVM lint and SDK/schema validation passed on Linux CI; official GenLayer Direct Mode passed **10 tests** on commit `a7c8d26`.
 - Frontend `npm ci`, `npm test`, and `npm run build` passed on Linux CI for the refactor commits. Windows Vite/Vitest startup is blocked by sandbox access denial while esbuild reads above the workspace.
 - Local Windows GenVM lint passes its lint stage; its SDK validation cannot access the cached SDK extraction. Linux CI validation is authoritative.
-- Direct Mode currently has a failing patch reassessment lifecycle case, so no current official Direct Mode pass is claimed.
+- A small follow-up UI no-op check and historical-deployment documentation change is pending final CI. The contract and Direct Mode test logic is unchanged since the passing run.
 
 ## Historical deployment counts (pre-refactor)
 
