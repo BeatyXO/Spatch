@@ -141,6 +141,7 @@ def test_direct_full_lifecycle_replay_patch_and_dependency_recovery(direct_deplo
     ]))
     next_assessment = int(contract.assess_advisory(project_id, GHSA))
     assert next_assessment > assessment_id
+    print("PATCH_REASSESS", contract.get_assessment(next_assessment), contract.get_findings(dep_id), contract.get_component(dep_id))
     assert contract.get_component(dep_id)["status"] == "ACTIVE"
     assert contract.get_findings(dep_id)["pending_advisories"] == []
     app = contract.get_component(app_id)
@@ -328,6 +329,8 @@ def test_direct_history_bound_rejects_patch_without_mutation(
     verified_sealed(contract, direct_vm, project_id, dep_id, app_id, direct_bob)
     component = contract.get_component(dep_id)
     component["status"] = "VULNERABLE"
+    component["security_status"] = "VULNERABLE"
+    component["findings"] = [{"advisory_id": GHSA, "version_revision": component["version_revision"], "verdict": "AFFECTED", "component_id": dep_id, "reason_code": "VERSION_IN_AFFECTED_RANGE", "assessment_id": 1, "fixed_version": "3.1.5", "attempts": 1}]
     component["history"] = [
         {"version": f"0.0.{index}", "status": "VULNERABLE"}
         for index in range(8)
