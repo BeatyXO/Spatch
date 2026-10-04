@@ -118,6 +118,9 @@ let project = await read('get_project', [projectId]);
 assert(project.status === 'SEALED', 'sealed graph', project);
 
 await write(observerClient, observer, 'assess_vulnerable_version', 'assess_advisory', [projectId, process.env.SPATCH_GHSA]);
+counts = await read('get_counts');
+const liveAssessment = await read('get_assessment', [Number(counts.assessments)]);
+assert(liveAssessment.status === 'ASSESSED', 'advisory source and validator result', liveAssessment);
 dep = await read('get_component', [dependencyId]);
 app = await read('get_component', [appId]);
 assert(dep.status === 'VULNERABLE' && app.status === 'RECHECK_REQUIRED', 'vulnerability blast radius', { dep, app });

@@ -106,6 +106,17 @@ def parse_json_response(response, max_body=MAX_SOURCE_BODY):
     return value, body
 
 
+def source_parse_failure(label, response, body):
+    status = int(getattr(response, "status", getattr(response, "status_code", 0)))
+    if status != 200:
+        return label + "_HTTP_" + str(status)
+    if len(body) < 2:
+        return label + "_EMPTY_BODY"
+    if len(body) > MAX_SOURCE_BODY:
+        return label + "_BODY_TOO_LARGE_" + str(len(body))
+    return label + "_INVALID_JSON_" + str(len(body))
+
+
 def advisory_projection(osv, ghsa):
     aliases = osv.get("aliases", []) if isinstance(osv, dict) else []
     affected = osv.get("affected", []) if isinstance(osv, dict) else []
@@ -522,7 +533,16 @@ class Spatch(gl.Contract):
                 osv, osv_body = parse_json_response(osv_response)
                 ghsa, ghsa_body = parse_json_response(ghsa_response)
                 if osv is None or ghsa is None:
-                    return canon({"kind": UNRESOLVED, "reason": "ADVISORY_SOURCE_UNAVAILABLE"})
+                    failures = []
+                    if osv is None:
+                        failures.append(source_parse_failure("OSV", osv_response, osv_body))
+                    if ghsa is None:
+                        failures.append(source_parse_failure("GHSA", ghsa_response, ghsa_body))
+                    return canon({
+                        "kind": UNRESOLVED,
+                        "reason": "ADVISORY_SOURCE_UNAVAILABLE",
+                        "diagnostic": ";".join(failures)[:128],
+                    })
                 if str(osv.get("id", "")).upper() != advisory_id or str(ghsa.get("ghsa_id", "")).upper() != advisory_id:
                     return canon({"kind": UNRESOLVED, "reason": "ADVISORY_IDENTITY_MISMATCH"})
                 projection = advisory_projection(osv, ghsa)

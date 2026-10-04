@@ -178,12 +178,12 @@ def test_direct_malformed_model_output_fails_closed(direct_deploy, direct_vm, di
     assert contract.get_component(dep_id)["status"] == "ACTIVE"
 
 
-@pytest.mark.parametrize("source_response", [
-    {"method": "GET", "status": 503, "body": "offline"},
-    {"method": "GET", "status": 200, "body": "{"},
+@pytest.mark.parametrize(("source_response", "expected_diagnostic"), [
+    ({"method": "GET", "status": 503, "body": "offline"}, "OSV_HTTP_503"),
+    ({"method": "GET", "status": 200, "body": "{not-json}"}, "OSV_INVALID_JSON_10"),
 ], ids=["osv-outage", "malformed-osv-json"])
 def test_direct_advisory_source_failures_fail_closed(
-    direct_deploy, direct_vm, direct_alice, direct_bob, source_response,
+    direct_deploy, direct_vm, direct_alice, direct_bob, source_response, expected_diagnostic,
 ):
     contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
     project_id, dep_id, app_id = draft(contract, direct_vm, direct_alice)
@@ -204,6 +204,7 @@ def test_direct_advisory_source_failures_fail_closed(
     assessment = contract.get_assessment(assessment_id)
     assert assessment["status"] == "UNRESOLVED"
     assert assessment["reason"] == "ADVISORY_SOURCE_UNAVAILABLE"
+    assert assessment["diagnostic"] == expected_diagnostic
     assert contract.get_component(dep_id)["status"] == "ACTIVE"
     assert contract.get_component(app_id)["status"] == "ACTIVE"
 
