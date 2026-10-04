@@ -8,7 +8,7 @@ Status after the security-state refactor and fresh Studionet deployment.
 - Official GenLayer Direct Mode suite (`genlayer-test==0.29.2`) — **10 passed** on Linux CI.
 - GenVM lint — **3 checks passed**; GenVM SDK/schema validation passed on Linux CI.
 - Frontend — `npm test` **3 passed**; `npm run build` passed; lockfile install uses `npm ci` in CI.
-- Final GitHub Actions run: [37229332642](https://github.com/BeatyXO/Spatch/actions/runs/37229332642) — **success** for source commit `a64b1fee698aa9112b150d28921552825a5cc30e`.
+- Verified full CI run: [37231507889](https://github.com/BeatyXO/Spatch/actions/runs/37231507889) — **success**. Subsequent repository-cleanup commits are documentation/metadata-only and automatically trigger the same CI workflow; the deployed contract source remains pinned to the verified source identity recorded below.
 - Fresh Studionet deployment (chain 61999) — finalized; schema verified and deployed source SHA-256 matches current `contracts/spatch.py` after newline normalization. Address/source relationship is in `deployments/studionet.json`.
 - Fresh two-wallet lifecycle — **PASS**. All listed writes were finalized and read back, including unauthorized/stale no-ops, identity, seal, vulnerable finding, replay protection, blocked recovery, patch/history/proof clearing, same-GHSA new-version reassessment, identity-vs-recheck proof, and downstream recovery. See `docs/LIVE_EVIDENCE.md`.
 - The GenLayer JS browser adapter uses finalized reads and waits for finalized writes; no-op contract returns are surfaced as failures. Wallet change and wrong-network handling are implemented and frontend tests/build pass.
