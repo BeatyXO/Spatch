@@ -40,7 +40,17 @@ a { color: inherit; text-decoration: none; }
 .header-actions { display: flex; align-items: center; gap: 10px; }
 .network { color: #cbe8ff; font-size: 12px; padding: 9px 12px; border: 1px solid rgba(137,200,255,.16); border-radius: 999px; background: rgba(7,38,82,.45); }
 .network-wrong { color: #ffd1d8; border-color: rgba(255,103,125,.55); background: rgba(110,22,47,.4); }
+.network-switch { cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font: inherit; }
+.network-switch:hover:not(:disabled) { border-color: rgba(255,142,162,.8); background: rgba(130,29,57,.58); }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #56e1ff; box-shadow: 0 0 12px #56e1ff; margin-right: 7px; }
+.wallet-control { position: relative; }
+.wallet-button { min-height: 48px; }
+.wallet-menu { position: absolute; top: calc(100% + 9px); right: 0; z-index: 40; width: min(330px, calc(100vw - 28px)); padding: 13px; border-radius: 17px; display: grid; gap: 7px; box-shadow: 0 18px 55px rgba(0,8,25,.48); }
+.wallet-menu-label { color: #74d8ff; font-size: 9px; letter-spacing: 1.6px; font-weight: 800; }
+.wallet-address { padding: 8px; border-radius: 9px; overflow-wrap: anywhere; color: #e4f4ff; background: rgba(1,17,42,.4); font-size: 10px; }
+.wallet-menu-action { justify-content: flex-start; width: 100%; padding: 10px; border: 1px solid transparent; color: #d8efff; background: transparent; text-align: left; font-size: 12px; }
+.wallet-menu-action:hover:not(:disabled) { background: rgba(49,133,207,.19); border-color: rgba(117,197,255,.18); }
+.wallet-disconnect { color: #bce3ff; border-top: 1px solid rgba(163,211,255,.12); border-radius: 0 0 9px 9px; }
 main { width: min(1380px, calc(100% - 34px)); margin: 0 auto; padding: 68px 0 54px; }
 .hero { display: grid; grid-template-columns: 1.12fr .88fr; align-items: center; gap: 54px; min-height: 515px; }
 .hero-copy { max-width: 760px; }
@@ -94,4 +104,4 @@ input:focus, select:focus { border-color: rgba(90,202,255,.5); box-shadow: 0 0 0
 .spin { animation: spin .9s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
 footer { width: min(1380px, calc(100% - 34px)); margin: 0 auto; padding: 0 0 30px; display: flex; justify-content: space-between; gap: 12px; color: #6f9fc5; font-size: 10px; }
 @media (max-width: 1040px) { .hero { grid-template-columns: 1fr; min-height: auto; padding-top: 42px; }.hero-visual { justify-self: stretch; width: 100%; transform: none; }.workspace-grid { grid-template-columns: 1fr; }.actions-column { position: static; max-height: none; grid-template-columns: repeat(2, minmax(0,1fr)); }.stats { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 690px) { .topbar { width: calc(100% - 18px); margin-top: 9px; border-radius: 17px; }.brand small, .network { display: none; }.header-actions { margin-left: auto; }.hero h1 { letter-spacing: -2px; }.hero { gap: 24px; }.flow-row { grid-template-columns: 1fr; }.flow-row > svg { justify-self: center; transform: rotate(90deg); }.stats { grid-template-columns: 1fr 1fr; }.workspace-grid { gap: 14px; }.actions-column { grid-template-columns: 1fr; }.section-title { align-items: start; flex-direction: column; }.load-row { width: 100%; }.load-row input { flex: 1; }.component-title { flex-direction: column; }.edge-row { grid-template-columns: 1fr; }.edge-row b { text-align: left; }.two-col { grid-template-columns: 1fr; }.banner { align-items: flex-start; flex-direction: column; } footer { flex-direction: column; } }
+@media (max-width: 690px) { .topbar { width: calc(100% - 18px); margin-top: 9px; border-radius: 17px; }.brand small, .header-actions > .network { display: none; }.header-actions { margin-left: auto; }.wallet-menu { right: 0; }.hero h1 { letter-spacing: -2px; }.hero { gap: 24px; }.flow-row { grid-template-columns: 1fr; }.flow-row > svg { justify-self: center; transform: rotate(90deg); }.stats { grid-template-columns: 1fr 1fr; }.workspace-grid { gap: 14px; }.actions-column { grid-template-columns: 1fr; }.section-title { align-items: start; flex-direction: column; }.load-row { width: 100%; }.load-row input { flex: 1; }.component-title { flex-direction: column; }.edge-row { grid-template-columns: 1fr; }.edge-row b { text-align: left; }.two-col { grid-template-columns: 1fr; }.banner { align-items: flex-start; flex-direction: column; } footer { flex-direction: column; } }

@@ -9,6 +9,14 @@ type Provider = NonNullable<Window['ethereum']> & {
 };
 
 export const CHAIN_ID = 61999;
+const CHAIN_ID_HEX = `0x${CHAIN_ID.toString(16)}`;
+const STUDIONET_CHAIN = {
+  chainId: CHAIN_ID_HEX,
+  chainName: 'GenLayer Studionet',
+  nativeCurrency: { name: 'GEN', symbol: 'GEN', decimals: 18 },
+  rpcUrls: ['https://studio.genlayer.com/api'],
+  blockExplorerUrls: ['https://explorer-studio.genlayer.com'],
+};
 export const CONTRACT = (import.meta.env.VITE_CONTRACT_ADDRESS || '').trim();
 export const configured = /^0x[a-fA-F0-9]{40}$/.test(CONTRACT) && !/^0x0{40}$/.test(CONTRACT);
 export const reader = createClient({ chain: studionet });
@@ -21,8 +29,29 @@ export async function connectWallet(provider: Provider | undefined = window.ethe
   const account = accounts?.[0] || '';
   if (!/^0x[a-fA-F0-9]{40}$/.test(account)) throw new Error('The wallet returned no valid account.');
   const chain = BigInt(String(await provider.request({ method: 'eth_chainId' })));
-  if (chain !== BigInt(CHAIN_ID)) throw new Error('Switch the wallet to GenLayer Studionet (chain ID 61999).');
+  if (chain !== BigInt(CHAIN_ID)) throw new Error('Your wallet is on the wrong network. Choose “Switch to Studionet” in the wallet menu.');
   return account;
+}
+
+export async function switchToStudionet(provider: Provider | undefined = window.ethereum) {
+  if (!provider?.request) throw new Error('Install or enable an injected wallet such as Rabby or MetaMask.');
+  try {
+    await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN_ID_HEX }] });
+  } catch (error) {
+    const code = (error as { code?: number })?.code;
+    if (code !== 4902) throw error;
+    await provider.request({ method: 'wallet_addEthereumChain', params: [STUDIONET_CHAIN] });
+    await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN_ID_HEX }] });
+  }
+  const chain = BigInt(String(await provider.request({ method: 'eth_chainId' })));
+  if (chain !== BigInt(CHAIN_ID)) throw new Error('The wallet did not switch to GenLayer Studionet (chain ID 61999).');
+}
+
+export async function disconnectWallet(provider: Provider | undefined = window.ethereum) {
+  if (!provider?.request) return;
+  // Revoke account access where the injected wallet implements the optional method.
+  try { await provider.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] }); }
+  catch { /* The app still clears its local connection when a wallet lacks revocation support. */ }
 }
 
 export async function walletState(provider: Provider | undefined = window.ethereum) {

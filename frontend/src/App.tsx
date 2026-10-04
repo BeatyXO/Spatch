@@ -5,6 +5,8 @@ import {
   Boxes,
   Bug,
   CheckCircle2,
+  ChevronDown,
+  Copy,
   ExternalLink,
   GitBranch,
   LoaderCircle,
@@ -12,10 +14,11 @@ import {
   RefreshCw,
   ShieldCheck,
   Sparkles,
+  Unplug,
   Wrench,
 } from 'lucide-react';
 import { Component, Counts, Edge, parsePositiveInt, Project, statusLabel, statusTone } from './actions';
-import { CHAIN_ID, CONTRACT, configured, connectWallet, explorerAddress, readFinalized, short, txUrl, walletState, writeFinalized } from './genlayer';
+import { CHAIN_ID, CONTRACT, configured, connectWallet, disconnectWallet, explorerAddress, readFinalized, short, switchToStudionet, txUrl, walletState, writeFinalized } from './genlayer';
 
 const emptyCounts: Counts = { projects: 0, components: 0, edges: 0, assessments: 0 };
 
@@ -39,6 +42,8 @@ function ActionCard({ icon, title, text, children }: { icon: React.ReactNode; ti
 export default function App() {
   const [account, setAccount] = useState('');
   const [wrongNetwork, setWrongNetwork] = useState(false);
+  const [walletMenuOpen, setWalletMenuOpen] = useState(false);
+  const [walletDisconnected, setWalletDisconnected] = useState(false);
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const [lastTx, setLastTx] = useState('');
@@ -51,12 +56,13 @@ export default function App() {
   useEffect(() => {
     const provider = window.ethereum as (typeof window.ethereum & { on?: (event: string, listener: () => void) => void; removeListener?: (event: string, listener: () => void) => void }) | undefined;
     if (!provider?.on) return;
-    const sync = () => { void walletState(provider).then(({ account: next, wrongNetwork: wrong }) => { setAccount(next); setWrongNetwork(wrong); }).catch(() => { setAccount(''); setWrongNetwork(false); }); };
-    provider.on('accountsChanged', sync);
+    const sync = () => { void walletState(provider).then(({ account: next, wrongNetwork: wrong }) => { setAccount(walletDisconnected ? '' : next); setWrongNetwork(walletDisconnected ? false : wrong); }).catch(() => { setAccount(''); setWrongNetwork(false); }); };
+    const accountChanged = () => { setWalletDisconnected(false); sync(); };
+    provider.on('accountsChanged', accountChanged);
     provider.on('chainChanged', sync);
     sync();
-    return () => { provider.removeListener?.('accountsChanged', sync); provider.removeListener?.('chainChanged', sync); };
-  }, []);
+    return () => { provider.removeListener?.('accountsChanged', accountChanged); provider.removeListener?.('chainChanged', sync); };
+  }, [walletDisconnected]);
 
   const [projectTitle, setProjectTitle] = useState('Production dependency graph');
   const [componentForm, setComponentForm] = useState({ ecosystem: 'pypi', name: 'jinja2', version: '3.1.4' });
@@ -117,9 +123,31 @@ export default function App() {
 
   async function onConnect() {
     setBusy('connect'); setNotice('');
-    try { const address = await connectWallet(); setAccount(address); setNotice('Wallet connected to Studionet.'); }
+    try { const address = await connectWallet(); setWalletDisconnected(false); setAccount(address); setWrongNetwork(false); setWalletMenuOpen(false); setNotice('Wallet connected to Studionet.'); }
     catch (error) { setNotice(error instanceof Error ? error.message : String(error)); }
     finally { setBusy(''); }
+  }
+
+  async function onSwitchNetwork() {
+    setBusy('switch-network'); setNotice('');
+    try {
+      await switchToStudionet();
+      setWrongNetwork(false);
+      setNotice('Wallet switched to GenLayer Studionet (chain ID 61999).');
+    } catch (error) { setNotice(error instanceof Error ? error.message : String(error)); }
+    finally { setBusy(''); }
+  }
+
+  async function onCopyAddress() {
+    try { await navigator.clipboard.writeText(account); setNotice('Wallet address copied.'); }
+    catch { setNotice('Could not copy the address. Select and copy it from the wallet menu.'); }
+  }
+
+  async function onDisconnect() {
+    await disconnectWallet();
+    setWalletDisconnected(true);
+    setAccount(''); setWrongNetwork(false); setWalletMenuOpen(false);
+    setNotice('Disconnected from Spatch. Reconnect your wallet to sign transactions.');
   }
 
   const rootNames = new Map(components.map((c) => [c.id, `${c.name}@${c.version}`]));
@@ -133,8 +161,20 @@ export default function App() {
           <div><strong>Spatch</strong><small>Security patch intelligence on GenLayer</small></div>
         </div>
         <div className="header-actions">
-          <span className={`network ${wrongNetwork ? 'network-wrong' : ''}`}><span className="dot" /> {wrongNetwork ? 'Wrong wallet network' : `Studionet · ${CHAIN_ID}`}</span>
-          <button className="secondary" onClick={onConnect} disabled={!!busy}>{busy === 'connect' ? <LoaderCircle className="spin" size={16} /> : null}{account ? short(account) : 'Connect wallet'}</button>
+          {wrongNetwork ? <button className="network network-wrong network-switch" onClick={onSwitchNetwork} disabled={!!busy} title="Switch wallet to GenLayer Studionet">{busy === 'switch-network' ? <LoaderCircle className="spin" size={15} /> : <span className="dot" />} Switch to Studionet · {CHAIN_ID}</button> : <span className="network"><span className="dot" /> Studionet · {CHAIN_ID}</span>}
+          <div className="wallet-control">
+            <button className="secondary wallet-button" onClick={() => account ? setWalletMenuOpen((open) => !open) : onConnect()} disabled={!!busy} aria-haspopup={account ? 'menu' : undefined} aria-expanded={account ? walletMenuOpen : undefined}>
+              {busy === 'connect' ? <LoaderCircle className="spin" size={16} /> : null}{account ? short(account) : 'Connect wallet'}{account && <ChevronDown size={15} />}
+            </button>
+            {walletMenuOpen && account && <div className="wallet-menu glass" role="menu" aria-label="Wallet options">
+              <span className="wallet-menu-label">CONNECTED ACCOUNT</span>
+              <code className="wallet-address">{account}</code>
+              <button className="wallet-menu-action" onClick={onCopyAddress} role="menuitem"><Copy size={15} /> Copy address</button>
+              {wrongNetwork && <button className="wallet-menu-action" onClick={onSwitchNetwork} disabled={!!busy} role="menuitem"><RefreshCw size={15} /> Switch to Studionet</button>}
+              <button className="wallet-menu-action" onClick={() => { setWalletMenuOpen(false); void onConnect(); }} role="menuitem"><RefreshCw size={15} /> Reconnect / change account</button>
+              <button className="wallet-menu-action wallet-disconnect" onClick={() => void onDisconnect()} role="menuitem"><Unplug size={15} /> Disconnect from Spatch</button>
+            </div>}
+          </div>
         </div>
       </header>
 
