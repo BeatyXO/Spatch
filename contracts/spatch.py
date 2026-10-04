@@ -569,8 +569,14 @@ class Spatch(gl.Contract):
                     "source_digest": digest_json({"osv": digest_bytes(osv_body), "github": digest_bytes(ghsa_body)}),
                     "results": rows,
                 })
-            except Exception:
-                return canon({"kind": UNRESOLVED, "reason": "ADVISORY_SOURCE_OR_MODEL_FAILURE"})
+            except Exception as exc:
+                # Expose only a bounded exception type, never error text, raw source
+                # bodies, URLs, prompts, or credentials. The outcome remains fail-closed.
+                return canon({
+                    "kind": UNRESOLVED,
+                    "reason": "ADVISORY_SOURCE_OR_MODEL_FAILURE",
+                    "diagnostic": type(exc).__name__[:64],
+                })
 
         def validator(leader_result):
             if not isinstance(leader_result, gl.vm.Return):
@@ -596,6 +602,7 @@ class Spatch(gl.Contract):
             "advisory_id": advisory_id,
             "status": consensus.get("kind", UNRESOLVED),
             "reason": consensus.get("reason", ""),
+            "diagnostic": consensus.get("diagnostic", ""),
             "source_digest": consensus.get("source_digest", ""),
             "results": consensus.get("results", []),
         })
