@@ -1,26 +1,32 @@
 # Verification status
 
-Snapshot of the current `main` worktree on 2026-10-04. This is not a release or deployment claim.
+Final verification status for 2026-10-04. This records verified results and explicit gaps; it is not a claim that browser-wallet and frontend hosting work has been completed.
 
-## Completed locally
+## Green checks
 
-- Existing lightweight suite: `python -m pytest tests -q` — **15 passed**.
-- Python compilation: `python -m py_compile contracts/spatch.py` — passed.
-- GenVM lint: `genvm-lint check contracts/spatch.py` — lint passed (**3 checks**). SDK validation could not finish because the Windows linter cache returned `Access denied` for the extracted runner.
-- Frontend dependencies: installed from the manifest; `frontend/package-lock.json` was generated.
-- Frontend tests: `npm test` — **2 passed**.
-- Frontend production build: `npm run build` — passed with the configured pre-deployment build. Vite reports a large JavaScript chunk advisory.
-- Fixture research: [GHSA-gmj6-6f8f-6699](https://github.com/advisories/GHSA-gmj6-6f8f-6699), Jinja2 3.1.4 affected and 3.1.5 fixed, independently confirmed from deps.dev, OSV and GitHub Advisory Database. Flask 3.0.0 is recognized by deps.dev as the dependent candidate. Details are in `docs/SOURCE_MANIFEST.md`.
-- Official GenLayer Direct Mode tests: **5 cases added** under `integration/test_direct_mode.py`, covering the core lifecycle, replay, patch and recovery, creator/order checks, failed identity sources, stale revisions, custom-validator agreement/disagreement, malformed model output, and graph bounds. They pin the official v0.2.16 SDK bundle matching the contract's runner hash because `genlayer-test==0.29.2` looks for an asset name removed from the current GenVM release feed. SDK setup now succeeds locally; tests fail before contract loading on this Windows host when `genlayer-test==0.29.2` unlinks its stdin temp file. CI will exercise the tests on Linux.
-- Repository: `https://github.com/BeatyXO/Spatch`; commit `4430706` is pushed to `main`. Its Actions run failed when the Direct Mode downloader received HTTP 404 for the retired GenVM release asset; the release-cache compatibility fix has not yet been run in CI.
+- Lightweight contract/architecture suite: `python -m pytest tests -q` — **15 passed**.
+- Official GenLayer Direct Mode suite (`genlayer-test==0.29.2`, Linux CI) — **8 passed**. Covers full lifecycle, identity/source failures, validator agreement/disagreement, malformed model output, graph ordering/bounds, and history bounds.
+- GenVM lint — **3 checks passed**. CI also ran GenVM SDK validation successfully on Linux.
+- Frontend: `npm test` — **2 passed**; `npm run build` — **passed**. Vite reports a large JavaScript chunk advisory.
+- GitHub Actions — **passed**: [run 37223117765](https://github.com/BeatyXO/Spatch/actions/runs/37223117765).
+- Python compilation and `node --check scripts/run_live_e2e.mjs` — passed.
+- Final source deployed to Studionet chain ID 61999; deployed source SHA-256 matches `contracts/spatch.py` exactly after newline normalization. See `docs/LIVE_EVIDENCE.md`.
+- Fresh two-wallet live lifecycle — **PASS**: assessment, propagation, same-version replay protection, patch history/proof clearing, patch identity verification, same-GHSA reassessment at version revision 2, and deterministic downstream recovery all finalized and read back.
+- Local browser preview loaded the final contract's finalized project and rendered the 1/2/1/6 counts, versions, history, edge and active statuses. The Connect action showed the expected “Install or enable an injected wallet such as Rabby or MetaMask” message; `window.ethereum` was absent.
+- Production build with `VITE_CONTRACT_ADDRESS` set to the final address — passed; verified that canonical address is embedded in generated bundle.
 
-## Not completed or verified
+## Final live counts
 
-- The SDK cache compatibility fix is not yet committed or pushed; CI has not yet run on it.
-- Full GenVM SDK validation/schema verification remains unresolved.
-- No final contract has been deployed. `deployments/studionet.json` remains pre-deployment.
-- No fresh two-wallet Studionet lifecycle, transaction hashes, browser-wallet E2E, or final explorer readbacks exist.
-- No frontend production deployment exists; no final contract address is configured.
-- GitHub Actions status for the final source is not yet available.
+- Projects: **1** (sealed)
+- Components: **2** (Jinja2 3.1.5 active; Flask 3.0.0 active)
+- Edges: **1**
+- Assessments: **6**
 
-No address, transaction hash, deployment URL, or live PASS has been fabricated. The live evidence file remains a not-run placeholder.
+## Limits and caveats
+
+- Local Windows GenVM lint invocation passes lint but cannot complete SDK validation because the local cache does not contain the expected SDK archive. Linux CI completed validation successfully.
+- Local Windows Direct Mode execution remains blocked by `genlayer-test`'s stdin temp-file unlink behavior. The official suite ran and passed on Linux CI.
+- Browser-wallet E2E was not run: the connected in-app browser has no injected provider or available wallet extension. Do not treat SDK/live-chain runner results as browser-wallet evidence. Responsive viewport breakpoints, wallet network/account changes, and wallet-signed write methods were not exercised in a wallet-enabled browser.
+- Frontend production hosting is not done. The user requested to perform that deployment; set `VITE_CONTRACT_ADDRESS` to the final address in the production host.
+- No production URL or HTTP 200 check is claimed.
+- Earlier failed/diagnostic deployments are non-canonical; only the address and deployment transaction in `deployments/studionet.json` and `docs/LIVE_EVIDENCE.md` are final.

@@ -44,11 +44,19 @@ Views: `get_project`, `get_component`, `get_edge`, `get_assessment`, `get_counts
 
 See [architecture](docs/ARCHITECTURE.md), [threat model](docs/THREAT_MODEL.md), [source manifest](docs/SOURCE_MANIFEST.md), and [verification status](docs/VERIFICATION.md).
 
+## Final deployment
+
+- Network: GenLayer Studionet, chain ID **61999**.
+- Contract: [`0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1`](https://explorer-studio.genlayer.com/address/0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1).
+- Frontend production URL: not yet deployed. The project owner is deploying it.
+- Production build environment: `VITE_CONTRACT_ADDRESS=0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1`.
+- Finalized two-wallet lifecycle evidence and transaction hashes are in [live evidence](docs/LIVE_EVIDENCE.md).
+
 ## Local checks
 
 ```bash
 python -m pytest tests -q
-# 15 tests currently pass in the pre-Codex package
+# 15 lightweight tests pass
 
 pip install genvm-linter
 genvm-lint check contracts/spatch.py
@@ -59,7 +67,7 @@ npm test
 npm run build
 ```
 
-The final three commands require network-installed dependencies and are intentionally listed as Codex release gates. The current chat environment could run the Python mock suite but could not download npm/PyPI packages for linter/frontend execution.
+The official GenLayer Direct Mode suite (8 cases), frontend checks, and GenVM checks run in [GitHub Actions](https://github.com/BeatyXO/Spatch/actions/runs/37223117765). Final counts and platform-specific limitations are in [verification status](docs/VERIFICATION.md).
 
 ## Frontend direction
 
@@ -67,11 +75,11 @@ The frontend is intentionally distinctive but readable: layered **shades of blue
 
 ## Deployment status
 
-Pre-deployment. `deployments/studionet.json` and `docs/LIVE_EVIDENCE.md` are placeholders and must only be replaced with real final evidence after deployment. The frontend reads `VITE_CONTRACT_ADDRESS`; no fake contract address is committed.
+The Studionet contract is deployed and verified. Frontend production hosting remains for the project owner; set `VITE_CONTRACT_ADDRESS` to the contract address above. Browser-wallet E2E is not claimed because no injected wallet is available in the connected browser environment.
 
 ## Verified advisory fixture
 
-The selected fixture is [GHSA-gmj6-6f8f-6699](https://github.com/advisories/GHSA-gmj6-6f8f-6699) for PyPI `jinja2`: version **3.1.4** is affected and **3.1.5** is the first fixed version. OSV and GitHub Advisory Database agree on the boundary, and deps.dev recognizes both exact package versions. PyPI `flask` **3.0.0** is the verified dependent-node candidate. This source verification does not imply that the on-chain lifecycle has been run; see [live evidence](docs/LIVE_EVIDENCE.md).
+The selected fixture is [GHSA-gmj6-6f8f-6699](https://github.com/advisories/GHSA-gmj6-6f8f-6699) for PyPI `jinja2`: version **3.1.4** is affected and **3.1.5** is the first fixed version. OSV and GitHub Advisory Database agree on the boundary, and deps.dev recognizes both exact package versions. PyPI `flask` **3.0.0** is the verified dependent-node candidate and was used in the live lifecycle documented in [live evidence](docs/LIVE_EVIDENCE.md). OSV's canonical endpoint retains `GHSA-` uppercase and lowercases the identifier groups.
 
 ## Final reviewer path after deployment
 

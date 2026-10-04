@@ -5,7 +5,7 @@ Spatch never accepts arbitrary evidence URLs. It constructs URLs from bounded pa
 | Purpose | Authority | Constructed endpoint | Consensus role |
 | --- | --- | --- | --- |
 | exact package/version identity | Google Open Source Insights / deps.dev | `https://api.deps.dev/v3/systems/<system>/packages/<name>/versions/<version>` | strict structured identity |
-| vulnerability record | OSV | `https://api.osv.dev/v1/vulns/<GHSA-ID>` | semantic advisory evidence |
+| vulnerability record | OSV | `https://api.osv.dev/v1/vulns/GHSA-<lowercase-id-groups>` | semantic advisory evidence |
 | advisory record | GitHub Advisory Database | `https://api.github.com/advisories/<GHSA-ID>` | semantic advisory evidence |
 
 ## Source-handling rules
@@ -21,7 +21,7 @@ Spatch never accepts arbitrary evidence URLs. It constructs URLs from bounded pa
 
 deps.dev provides a structured exact-version identity surface. OSV provides machine-readable affected-package/range data. GitHub Advisory Database provides a separate structured advisory representation for the same GHSA object. The combination lets Spatch validate identity deterministically and reserve AI consensus for the genuinely contextual task of applying advisory ranges to locked versions across ecosystems.
 
-## Verified live-lifecycle fixture candidate
+## Verified live-lifecycle fixture
 
 The following public fixture was checked against the live sources on 2026-10-04 before any deployment transaction:
 
@@ -32,4 +32,4 @@ The following public fixture was checked against the live sources on 2026-10-04 
 - GitHub Advisory Database returns the same GHSA, affected range `>= 3.0.0, <= 3.1.4`, and first patched version 3.1.5.
 - The proposed dependent node is PyPI `flask` **3.0.0**, also recognized by deps.dev.
 
-This fixture has an explicit affected/fixed boundary shared by OSV and GitHub. It is a verified fixture selection only; it is not evidence that a live contract lifecycle has run.
+This fixture has an explicit affected/fixed boundary shared by OSV and GitHub. The completed live result is recorded in `docs/LIVE_EVIDENCE.md`. OSV endpoint casing is case-sensitive: the `GHSA-` prefix stays uppercase while the three identifier groups are lowercase. Lowercasing the entire GHSA produced HTTP 404 during live diagnosis, so the contract now builds the provider's canonical path explicitly.

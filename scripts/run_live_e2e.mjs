@@ -69,12 +69,23 @@ function assert(ok, label, data) {
 const protocol = await read('get_protocol');
 assert(Number(protocol.chain_id) === 61999 && protocol.name === 'Spatch', 'protocol', protocol);
 const initial = await read('get_counts');
-assert(Number(initial.projects) === 0 && Number(initial.components) === 0, 'fresh deployment', initial);
+const resume = process.env.SPATCH_RESUME === '1';
+if (!resume) assert(Number(initial.projects) === 0 && Number(initial.components) === 0, 'fresh deployment', initial);
+else assert(Number(initial.projects) === 1 && Number(initial.components) === 2, 'resume existing live fixture', initial);
 
+let projectId;
+let dependencyId;
+let appId;
+let counts;
+let dep;
+let app;
+let project;
+if (!resume) {
 await write(authorClient, author, 'create_project', 'create_project', ['Spatch live evidence fixture']);
-let counts = await read('get_counts');
-const projectId = Number(counts.projects);
-const dependencyId = Number(counts.components) + 1;
+counts = await read('get_counts');
+projectId = Number(counts.projects);
+dependencyId = Number(counts.components) + 1;
+appId = dependencyId + 1;
 
 // An observer cannot mutate the creator's draft graph.
 const beforeUnauthorizedEdit = await read('get_counts');
@@ -88,12 +99,11 @@ counts = await read('get_counts');
 assert(Number(counts.components) === Number(beforeUnauthorizedEdit.components), 'creator-only mutation', counts);
 
 await write(authorClient, author, 'add_dependency_component', 'add_component', [projectId, process.env.SPATCH_DEP_ECOSYSTEM, process.env.SPATCH_DEP_NAME, process.env.SPATCH_VULN_VERSION]);
-const appId = dependencyId + 1;
 await write(authorClient, author, 'add_app_component', 'add_component', [projectId, process.env.SPATCH_APP_ECOSYSTEM, process.env.SPATCH_APP_NAME, process.env.SPATCH_APP_VERSION]);
 await write(authorClient, author, 'add_dependency_edge', 'add_dependency', [appId, dependencyId]);
 
-let dep = await read('get_component', [dependencyId]);
-let app = await read('get_component', [appId]);
+dep = await read('get_component', [dependencyId]);
+app = await read('get_component', [appId]);
 await write(observerClient, observer, 'verify_dependency', 'verify_component', [dependencyId, Number(dep.revision)]);
 await write(observerClient, observer, 'verify_app', 'verify_component', [appId, Number(app.revision)]);
 dep = await read('get_component', [dependencyId]);
@@ -114,10 +124,14 @@ assert(
 );
 
 await write(authorClient, author, 'seal_project', 'seal_project', [projectId]);
-let project = await read('get_project', [projectId]);
+project = await read('get_project', [projectId]);
 assert(project.status === 'SEALED', 'sealed graph', project);
 
 await write(observerClient, observer, 'assess_vulnerable_version', 'assess_advisory', [projectId, process.env.SPATCH_GHSA]);
+}
+projectId ??= 1;
+dependencyId ??= 1;
+appId ??= 2;
 counts = await read('get_counts');
 const liveAssessment = await read('get_assessment', [Number(counts.assessments)]);
 assert(liveAssessment.status === 'ASSESSED', 'advisory source and validator result', liveAssessment);
@@ -129,7 +143,7 @@ const vulnerableResult = vulnerableAssessment.results?.find(
   (result) => Number(result.component_id) === dependencyId,
 );
 assert(
-  vulnerableAssessment.advisory_id === process.env.SPATCH_GHSA && vulnerableResult &&
+  vulnerableAssessment.advisory_id === process.env.SPATCH_GHSA.toUpperCase() && vulnerableResult &&
     vulnerableResult.verdict === 'AFFECTED' &&
     Number(vulnerableResult.version_revision) === Number(dep.version_revision),
   'assessment bound to vulnerable version revision',
@@ -183,7 +197,7 @@ const patchedResult = patchedAssessment.results?.find(
   (result) => Number(result.component_id) === dependencyId,
 );
 assert(
-  patchedAssessment.advisory_id === process.env.SPATCH_GHSA && patchedResult &&
+  patchedAssessment.advisory_id === process.env.SPATCH_GHSA.toUpperCase() && patchedResult &&
     patchedResult.verdict === 'NOT_AFFECTED' &&
     patchedResult.reason_code === 'VERSION_OUTSIDE_AFFECTED_RANGE' &&
     Number(patchedResult.version_revision) === Number(dep.version_revision) &&

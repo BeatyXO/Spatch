@@ -1,9 +1,14 @@
 {
   "network": "GenLayer Studionet",
   "chainId": 61999,
-  "contractAddress": "",
+  "contractAddress": "0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1",
+  "explorerUrl": "https://explorer-studio.genlayer.com/address/0x3D8ac6480A830b0EC9cdE515D06F29F3364583B1",
+  "deploymentTransaction": "0x4c85655ddccf8328c92bcfc691a9175e884e51538105b967b7e078e09a97e51a",
   "sourceFile": "contracts/spatch.py",
-  "status": "pre-deployment",
+  "sourceSha256": "303a1738f0acea6a4358dc0ea44cad9670ae53935d4a1e62dc6458fb78324cd7",
+  "sourceGitBlob": "a0fcc1327998fdb0263c364f993df5ef6d62f0b6",
+  "sourceCommit": "3cb79e250965aace51cce14efa7f8369974f49c3",
+  "status": "deployed-verified",
   "protocolVersion": 1,
   "frontend": ""
 }
