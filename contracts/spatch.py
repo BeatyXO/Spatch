@@ -519,7 +519,9 @@ class Spatch(gl.Contract):
                     replay_keys.append(key)
         if not candidates:
             return "ADVISORY_ALREADY_ASSESSED_FOR_CURRENT_REVISIONS"
-        osv_url = OSV_BASE + advisory_id
+        # OSV resolves the GHSA path case-sensitively; keep the bound/stored ID
+        # uppercase while requesting the service's lowercase canonical path.
+        osv_url = OSV_BASE + advisory_id.lower()
         ghsa_url = GITHUB_ADVISORY_BASE + advisory_id
 
         def evaluate():
