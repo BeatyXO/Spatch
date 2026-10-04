@@ -78,7 +78,7 @@ The frontend is intentionally distinctive but readable: layered **shades of blue
 
 ## Deployment status
 
-The current contract and frontend are deployed and verified. The wallet menu supports copy, disconnect/reconnect, and switching to Studionet. Chrome smoke tests verified switching, copy and disconnect; full wallet E2E remains incomplete because reconnect approval, account-change and signed-transaction prompts were unavailable to the browser controller. See [verification status](docs/VERIFICATION.md).
+The current contract and frontend are deployed and verified. Chrome smoke tests verified the Studionet switch, account menu, copy, disconnect and reconnect flow. Full wallet E2E remains incomplete because account switching, rejection flows and signed transactions were not verified. See [verification status](docs/VERIFICATION.md).
 
 ## Verified advisory fixture
 
