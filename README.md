@@ -48,10 +48,10 @@ See [architecture](docs/ARCHITECTURE.md), [threat model](docs/THREAT_MODEL.md), 
 ## Current canonical deployment
 
 - Network: **GenLayer Studionet**, chain ID **61999**.
-- Canonical contract: [`0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`](https://explorer-studio.genlayer.com/address/0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39).
-- Deployment transaction: [`0x6704d8c446543fa1b2d635ae113ebb4f1de5cd5ca2f1a400fbac4232c158c380`](https://explorer-studio.genlayer.com/tx/0x6704d8c446543fa1b2d635ae113ebb4f1de5cd5ca2f1a400fbac4232c158c380).
-- Source/schema verification and the fresh two-wallet lifecycle are recorded in [live evidence](docs/LIVE_EVIDENCE.md).
-- Production frontend: [spatch-rosy.vercel.app](https://spatch-rosy.vercel.app), deployed from the GitHub `main` branch. [spatch-six.vercel.app](https://spatch-six.vercel.app) resolves to the same production assets. Both live bundles were verified to reference the canonical contract above; the build variable is `VITE_CONTRACT_ADDRESS=0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`.
+- Canonical contract: [`0x2e517eE9ABCB8f71bD3B8251315A3013C3e69cd6`](https://explorer-studio.genlayer.com/address/0x2e517eE9ABCB8f71bD3B8251315A3013C3e69cd6).
+- Deployment transaction: [`0xd4feff8ae226ca9198ce503182fdcbac4e3b47997a15f317a289f2681c5fbdbd`](https://explorer-studio.genlayer.com/tx/0xd4feff8ae226ca9198ce503182fdcbac4e3b47997a15f317a289f2681c5fbdbd).
+- The deployed source matches commit `02677b85fa7b3f3f9311583611bb4cc1c4919825`; schema and protocol reads passed. Deployment and lifecycle evidence is in [live evidence](docs/LIVE_EVIDENCE.md).
+- Production frontend: [spatch-rosy.vercel.app](https://spatch-rosy.vercel.app), with [spatch-six.vercel.app](https://spatch-six.vercel.app) as an alias. The current production build still points to the superseded contract until its Vercel environment is updated to `VITE_CONTRACT_ADDRESS=0x2e517eE9ABCB8f71bD3B8251315A3013C3e69cd6` and redeployed.
 - Superseded deployment evidence is retained only for auditability in [historical evidence](docs/HISTORICAL_EVIDENCE.md).
 
 ## Local checks
@@ -78,7 +78,7 @@ The frontend is intentionally distinctive but readable: layered **shades of blue
 
 ## Deployment status
 
-The current contract and frontend are deployed and verified. Browser wallet checks cover Studionet switching, account handling, copy, disconnect/reconnect, rejection flows, and signed transactions. See [verification status](docs/VERIFICATION.md).
+The contract source and schema are verified on Studionet. The refreshed contract lifecycle is pending; the earlier lifecycle evidence applies to the superseded deployment only. See [verification status](docs/VERIFICATION.md).
 
 ## Verified advisory fixture
 

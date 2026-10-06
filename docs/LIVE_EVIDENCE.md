@@ -1,17 +1,23 @@
 # GenLayer Studionet live evidence
 
-## Current canonical deployment and lifecycle
+## Current canonical deployment
 
-**Result: lifecycle PASS on GenLayer Studionet, chain ID 61999.** The fresh contract is the current source; listed state-changing transactions reached `FINALIZED`, and readbacks used latest finalized state. Author and observer wallets were distinct from each other and from the deployer.
+The capacity-boundary fix is deployed on stable GenLayer Studionet, chain ID 61999. The deployment transaction finalized successfully. Deployed source and schema were read back and verified against the pushed source commit. The fresh two-wallet lifecycle has not yet been run against this deployment.
 
 ### Deployment identity
 
-- Contract: [`0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`](https://explorer-studio.genlayer.com/address/0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39)
-- Deployment transaction: [`0x6704d8c446543fa1b2d635ae113ebb4f1de5cd5ca2f1a400fbac4232c158c380`](https://explorer-studio.genlayer.com/tx/0x6704d8c446543fa1b2d635ae113ebb4f1de5cd5ca2f1a400fbac4232c158c380)
-- Source SHA-256 (newline-normalized UTF-8): `a22c549fd0df48a312b93890d24f7cc3c8d2eb9e9d6140f146597156e12ac151`
-- Git blob: `24ded26de8861205c6b51659f85a7516878c92fe`
-- Source commit: `a64b1fee698aa9112b150d28921552825a5cc30e`
-- A fresh `genlayer-js.getContractCode` read against finalized Studionet returned source that byte-for-byte matches `contracts/spatch.py` after CRLF→LF normalization; both SHA-256 digests are `a22c549fd0df48a312b93890d24f7cc3c8d2eb9e9d6140f146597156e12ac151`. `genlayer schema` exposed all 9 public writes plus `get_findings` and `get_security_findings`. Finalized `get_protocol` reported version 2 and chain ID 61999. Initial counts were zero.
+- Contract: [`0x2e517eE9ABCB8f71bD3B8251315A3013C3e69cd6`](https://explorer-studio.genlayer.com/address/0x2e517eE9ABCB8f71bD3B8251315A3013C3e69cd6)
+- Deployment transaction: [`0xd4feff8ae226ca9198ce503182fdcbac4e3b47997a15f317a289f2681c5fbdbd`](https://explorer-studio.genlayer.com/tx/0xd4feff8ae226ca9198ce503182fdcbac4e3b47997a15f317a289f2681c5fbdbd)
+- Deployer: `0x7876e9f76f32925c212528d57bc9dfe5e34bcc07`
+- Source SHA-256 (newline-normalized UTF-8): `492f7f7ee8508039312dc63e049519cbfb7d4a765835e5ac0e7656f2c3eafc56`
+- Git blob: `e4cbc2c387aee9ddcafb6dc965c3a2f2eb495ead`
+- Source commit: `02677b85fa7b3f3f9311583611bb4cc1c4919825`
+- `genlayer code` returned source that exactly matches `contracts/spatch.py` after newline normalization. `genlayer schema` exposed all 9 public writes (`create_project`, `add_component`, `add_dependency`, `verify_component`, `seal_project`, `assess_advisory`, `patch_component`, `verify_patch`, `reassess_dependency`) and the read methods. `get_protocol` reports version 2 and chain ID 61999. Finalized reads report initial counts of zero projects, components, edges, and assessments.
+- The production frontend still points at the superseded contract until the Vercel environment variable is updated to this address and redeployed.
+
+## Previous deployment lifecycle (historical)
+
+The lifecycle evidence below applies only to contract `0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`, deployed before the finding-capacity fix. It does not verify the current deployment. The current capacity-boundary behavior is covered by the 11-test Direct Mode suite on Linux CI; a new live lifecycle remains pending.
 
 ### Wallet roles
 
