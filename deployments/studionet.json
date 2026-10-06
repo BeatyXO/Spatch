@@ -8,7 +8,7 @@
   "sourceSha256": "492f7f7ee8508039312dc63e049519cbfb7d4a765835e5ac0e7656f2c3eafc56",
   "sourceGitBlob": "e4cbc2c387aee9ddcafb6dc965c3a2f2eb495ead",
   "sourceCommit": "02677b85fa7b3f3f9311583611bb4cc1c4919825",
-  "status": "deployed-source-schema-verified-live-lifecycle-pending",
+  "status": "deployed-source-schema-verified-live-lifecycle-passed",
   "protocolVersion": 2,
   "frontend": "https://spatch-rosy.vercel.app",
   "frontendAlias": "https://spatch-six.vercel.app",

@@ -2,7 +2,7 @@
 
 ## Current canonical deployment
 
-The capacity-boundary fix is deployed on stable GenLayer Studionet, chain ID 61999. The deployment transaction finalized successfully. Deployed source and schema were read back and verified against the pushed source commit. The fresh two-wallet lifecycle has not yet been run against this deployment.
+The capacity-boundary fix is deployed on stable GenLayer Studionet, chain ID 61999. The deployment transaction finalized successfully. Deployed source and schema were read back and verified against the pushed source commit. The fresh two-wallet lifecycle below completed successfully, with finalized receipts and state readbacks.
 
 ### Deployment identity
 
@@ -15,9 +15,44 @@ The capacity-boundary fix is deployed on stable GenLayer Studionet, chain ID 619
 - `genlayer code` returned source that exactly matches `contracts/spatch.py` after newline normalization. `genlayer schema` exposed all 9 public writes (`create_project`, `add_component`, `add_dependency`, `verify_component`, `seal_project`, `assess_advisory`, `patch_component`, `verify_patch`, `reassess_dependency`) and the read methods. `get_protocol` reports version 2 and chain ID 61999. Finalized reads report initial counts of zero projects, components, edges, and assessments.
 - The production frontend still points at the superseded contract until the Vercel environment variable is updated to this address and redeployed.
 
+## Current fresh two-wallet lifecycle
+
+**Result: PASS.** This lifecycle ran on the current contract above using distinct author and observer wallets; the deployer was a third wallet. Every write listed below reached `FINALIZED`, and the runner asserted latest-finalized readbacks. Temporary encrypted keystore exports were removed after the run; no private keys were printed or committed.
+
+### Wallet roles and fixture
+
+- Deployer: `0x7876e9f76f32925c212528d57bc9dfe5e34bcc07`
+- Author/project creator: `0x6b476bf35c4968f3f1775c0ca2110591b4b5fcbe`
+- Observer: `0x77e2edbb43277bf772e207c517dde731935ffba5`
+- Fixture: PyPI `jinja2` **3.1.4 → 3.1.5**, [GHSA-gmj6-6f8f-6699](https://github.com/advisories/GHSA-gmj6-6f8f-6699); dependent PyPI `flask` **3.0.0**. deps.dev identity checks passed for all package/version pairs. The exact GHSA was fetched from OSV and GitHub Advisory Database; the independent validator agreed that 3.1.4 is affected and 3.1.5 is outside the range.
+
+### Finalized transactions
+
+| Operation | Finalized transaction | Readback |
+| --- | --- | --- |
+| Deploy capacity-fix contract | `0xd4feff8ae226ca9198ce503182fdcbac4e3b47997a15f317a289f2681c5fbdbd` | Source/schema verified; initial counts zero |
+| Create project | `0xda7a7933ca4f8908e691d195c7750b89cd887e23a035ef9b1726aa0018901295` | Project 1, author is creator |
+| Unauthorized observer edit | `0xf512e34c53cdf845bf9b9b73f1cf6f76422b2652d23e949f7e36eb17ec07079c` | `ONLY_PROJECT_CREATOR`; component count unchanged |
+| Add Jinja2 3.1.4 | `0xa54029d33540fc1a2c899a89099b0356ba4d8ee694f64b43f69e2e36bee4a11d` | Component 1 |
+| Add Flask 3.0.0 | `0x6bcc5e4a184ac8b0af8607556d5f6ee215a8d66a52a124027f2affe4aadda91c` | Component 2 |
+| Add dependency edge | `0xca53e4d0de6848521fcfefcb0c8bf02e51bdbc71e9c4dd486a89d3912577cfbd` | Flask depends on Jinja2 |
+| Observer verifies Jinja2 identity | `0x1338718c7bf637ecb6d002eb7f725278b8f7f87a7065536a618ca4010c144af6` | Version revision 1 verified |
+| Observer verifies Flask identity | `0xe359bb8e96e15c1e4b9ee8c1bf74323f0e1755c6c974f017c9df06019c8027b2` | Version revision 1 verified |
+| Stale identity revision attempt | `0xc5d72ea519b130ba04496fa1fca3da2dc2d93f738c594a0cfc47c5a420e8616a` | `STALE_COMPONENT_REVISION`; Jinja2 unchanged |
+| Seal project | `0x7ee8d2da3fc61873db685cbeb84e3e3cfdb385a6c3ffb5bcf13931ac896f3efc` | Project `SEALED` |
+| Assess vulnerable GHSA | `0x2befc36d583f74aaeaf4e933121f4a7b51c7f751fe51279e3a053e02d5ead285` | Assessment 3: Jinja2 `AFFECTED`; Flask `NOT_AFFECTED` and `RECHECK_REQUIRED` |
+| Replay same GHSA/version revision | `0x5b7b94a090bc026efdd0608a301c3d27bebdbe65f31ffab24f4ce6400a34eae8` | Replay rejected; assessment count stayed 3; Jinja2 remained vulnerable |
+| Refuse recovery while upstream vulnerable | `0xe4267f2284782aa06a073ca51705d6ca40e3b2a6471cc60d2f9b63b182999c4c` | Flask remained `RECHECK_REQUIRED` |
+| Stage Jinja2 3.1.5 patch | `0x47c6799ee8bf4aeb2c27fd655fdc9761ba6a8fd8e7c02592700eeefc6bdbd2af` | `PATCH_PENDING`; history retains vulnerable 3.1.4; identity proof cleared |
+| Verify patched identity | `0x42ba952112f0efe12f3ddffa5f2db2464265c8572fb3ce2b323c8e58d503e3f3` | Version revision 2 verified; security remains `SECURITY_REASSESS_REQUIRED` |
+| Reassess same GHSA after version change | `0xfb4ca2e4d9ae04a39735b2e8b57edc4f70e6953d476b58427487d91fe76c8e1b` | Assessment 5: Jinja2 3.1.5 `NOT_AFFECTED`, revision 2 |
+| Recover downstream Flask | `0xa21d055442f85117906a47bf4faed8a4514408f7ddfa573eaa3bd8b99581f916` | Assessment 6; Flask `ACTIVE` |
+
+Final reads: 1 sealed project, 2 components, 1 active edge, and 6 assessments. Jinja2 3.1.5 and Flask 3.0.0 are `ACTIVE`; the historical Jinja2 3.1.4 `AFFECTED` finding remains preserved under version revision 1.
+
 ## Previous deployment lifecycle (historical)
 
-The lifecycle evidence below applies only to contract `0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`, deployed before the finding-capacity fix. It does not verify the current deployment. The current capacity-boundary behavior is covered by the 11-test Direct Mode suite on Linux CI; a new live lifecycle remains pending.
+This earlier lifecycle applies only to contract `0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`, deployed before the finding-capacity fix. It is retained for auditability and does not replace the current lifecycle evidence above.
 
 ### Wallet roles
 

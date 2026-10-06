@@ -78,7 +78,7 @@ The frontend is intentionally distinctive but readable: layered **shades of blue
 
 ## Deployment status
 
-The contract source and schema are verified on Studionet. The refreshed contract lifecycle is pending; the earlier lifecycle evidence applies to the superseded deployment only. See [verification status](docs/VERIFICATION.md).
+The refreshed contract source, schema, and two-wallet lifecycle are verified on Studionet. The production frontend still needs its Vercel contract-address environment update and redeployment. See [verification status](docs/VERIFICATION.md).
 
 ## Verified advisory fixture
 
