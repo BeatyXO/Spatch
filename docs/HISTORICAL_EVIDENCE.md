@@ -53,4 +53,4 @@ Final finalized reads: 1 project (`SEALED`), 2 components (Jinja2 3.1.5 `ACTIVE`
 
 ## Historical browser-wallet and production limits
 
-The notes in this historical section apply only to the earlier contract deployment. For the current canonical contract, the injected-wallet and production-hosting limitations are documented in the current [verification status](VERIFICATION.md). Configure production with `VITE_CONTRACT_ADDRESS=0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39`.
+The notes in this historical section apply only to the earlier contract deployment and its production configuration. The current canonical contract and frontend configuration are documented in the [current verification status](VERIFICATION.md) and [`deployments/studionet.json`](../deployments/studionet.json).

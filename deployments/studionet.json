@@ -12,7 +12,7 @@
   "protocolVersion": 2,
   "frontend": "https://spatch-rosy.vercel.app",
   "frontendAlias": "https://spatch-six.vercel.app",
-  "frontendContractAddress": "0x2d531F147ad8EF488a5C01e2a9fF40dCC5fC8c39",
-  "frontendStatus": "owner-vercel-environment-update-required",
+  "frontendContractAddress": "0x2e517eE9ABCB8f71bD3B8251315A3013C3e69cd6",
+  "frontendStatus": "owner-reports-redeployed; production-bundle-not-independently-verified",
   "historicalEvidence": "docs/HISTORICAL_EVIDENCE.md"
 }

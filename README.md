@@ -51,7 +51,7 @@ See [architecture](docs/ARCHITECTURE.md), [threat model](docs/THREAT_MODEL.md), 
 - Canonical contract: [`0x2e517eE9ABCB8f71bD3B8251315A3013C3e69cd6`](https://explorer-studio.genlayer.com/address/0x2e517eE9ABCB8f71bD3B8251315A3013C3e69cd6).
 - Deployment transaction: [`0xd4feff8ae226ca9198ce503182fdcbac4e3b47997a15f317a289f2681c5fbdbd`](https://explorer-studio.genlayer.com/tx/0xd4feff8ae226ca9198ce503182fdcbac4e3b47997a15f317a289f2681c5fbdbd).
 - The deployed source matches commit `02677b85fa7b3f3f9311583611bb4cc1c4919825`; schema and protocol reads passed. Deployment and lifecycle evidence is in [live evidence](docs/LIVE_EVIDENCE.md).
-- Production frontend: [spatch-rosy.vercel.app](https://spatch-rosy.vercel.app), with [spatch-six.vercel.app](https://spatch-six.vercel.app) as an alias. The current production build still points to the superseded contract until its Vercel environment is updated to `VITE_CONTRACT_ADDRESS=0x2e517eE9ABCB8f71bD3B8251315A3013C3e69cd6` and redeployed.
+- Production frontend: [spatch-rosy.vercel.app](https://spatch-rosy.vercel.app), with [spatch-six.vercel.app](https://spatch-six.vercel.app) as an alias. The owner reports that Vercel has been redeployed for the canonical contract. This environment could not fetch the production page to independently verify the served bundle; the required setting is `VITE_CONTRACT_ADDRESS=0x2e517eE9ABCB8f71bD3B8251315A3013C3e69cd6`.
 - Superseded deployment evidence is retained only for auditability in [historical evidence](docs/HISTORICAL_EVIDENCE.md).
 
 ## Local checks
@@ -78,13 +78,13 @@ The frontend is intentionally distinctive but readable: layered **shades of blue
 
 ## Deployment status
 
-The refreshed contract source, schema, and two-wallet lifecycle are verified on Studionet. The production frontend still needs its Vercel contract-address environment update and redeployment. See [verification status](docs/VERIFICATION.md).
+The refreshed contract source, schema, and two-wallet lifecycle are verified on Studionet. The owner reports the production frontend has been redeployed; independent production-bundle verification remains pending because this environment could not access the host. See [verification status](docs/VERIFICATION.md).
 
 ## Verified advisory fixture
 
 The selected fixture is [GHSA-gmj6-6f8f-6699](https://github.com/advisories/GHSA-gmj6-6f8f-6699) for PyPI `jinja2`: version **3.1.4** is affected and **3.1.5** is the first fixed version. OSV and GitHub Advisory Database agree on the boundary, and deps.dev recognizes both exact package versions. PyPI `flask` **3.0.0** is the verified dependent-node candidate and was used in the live lifecycle documented in [live evidence](docs/LIVE_EVIDENCE.md). OSV's canonical endpoint retains `GHSA-` uppercase and lowercases the identifier groups.
 
-## Final reviewer path after deployment
+## Reviewer walkthrough
 
 1. Create a project.
 2. Add a dependency component first, then an application/framework component that depends on it.

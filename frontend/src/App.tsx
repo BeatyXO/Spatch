@@ -206,7 +206,7 @@ export default function App() {
 
         {!configured && (
           <div className="banner warning-banner">
-            <strong>Pre-deployment build.</strong> Set <code>VITE_CONTRACT_ADDRESS</code> after Codex deploys Spatch to stable Studionet.
+            <strong>Contract address is not configured in this build.</strong> Set <code>VITE_CONTRACT_ADDRESS</code> to the canonical Studionet contract address and rebuild.
           </div>
         )}
         {notice && <div className="banner"><span>{notice}</span>{lastTx && <a href={txUrl(lastTx)} target="_blank" rel="noreferrer">View transaction <ExternalLink size={14} /></a>}</div>}
