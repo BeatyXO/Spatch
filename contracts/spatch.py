@@ -253,12 +253,30 @@ class Spatch(gl.Contract):
                 return index
         return -1
 
+    def _finding_capacity_available(self, component, version_revision, advisory_id):
+        if self._finding_index(component, version_revision, advisory_id) >= 0:
+            return True
+        findings = component.get("findings", [])
+        return len(findings) < MAX_FINDINGS or any(
+            finding.get("verdict") == NOT_AFFECTED for finding in findings
+        )
+
     def _store_finding(self, component, version_revision, advisory_id, verdict, reason_code, fixed_version, assessment_id):
         findings = component.setdefault("findings", [])
         index = self._finding_index(component, version_revision, advisory_id)
         if index < 0:
             if len(findings) >= MAX_FINDINGS:
-                return False
+                # Permissionless, terminal NOT_AFFECTED results are scoped audit
+                # records, not security obligations. Reclaim the oldest such slot
+                # before refusing a new finding; the full result remains in the
+                # assessment ledger and its replay key remains consumed.
+                evictable = next((
+                    i for i, finding in enumerate(findings)
+                    if finding.get("verdict") == NOT_AFFECTED
+                ), -1)
+                if evictable < 0:
+                    return False
+                findings.pop(evictable)
             findings.append({
                 "advisory_id": advisory_id,
                 "component_id": int(component["id"]),
@@ -605,7 +623,7 @@ class Spatch(gl.Contract):
                 key = str(int(project_id)) + ":" + str(component["id"]) + ":" + str(component["version_revision"]) + ":" + advisory_id
                 if self.used_advisory.get(key):
                     continue
-                if self._finding_index(component, component["version_revision"], advisory_id) < 0 and len(component.get("findings", [])) >= MAX_FINDINGS:
+                if not self._finding_capacity_available(component, component["version_revision"], advisory_id):
                     return "FINDING_LIMIT"
                 candidates.append({
                     "component_id": component["id"],
@@ -818,7 +836,10 @@ class Spatch(gl.Contract):
         finding_refs = [{
             "advisory_id": finding["advisory_id"],
             "verdict": finding["verdict"],
+            "reason_code": finding["reason_code"],
             "assessment_id": finding["assessment_id"],
+            "fixed_version": finding.get("fixed_version", ""),
+            "attempts": int(finding.get("attempts", 1)),
         } for finding in current_findings]
         component["history"].append({
             "version": component["version"],
@@ -830,6 +851,10 @@ class Spatch(gl.Contract):
             "findings": finding_refs,
             "retired_at": now(),
         })
+        # Findings are scoped to a version revision. Their bounded references
+        # stay in history and full judgments stay in the assessment ledger, so
+        # retired versions do not consume the replacement version's capacity.
+        component["findings"] = []
         component["version"] = new_version
         component["revision"] += 1
         component["version_revision"] += 1
@@ -925,6 +950,13 @@ class Spatch(gl.Contract):
             if row["current"]:
                 current.append(row)
             else:
+                historical.append(row)
+        for entry in component.get("history", []):
+            for finding in entry.get("findings", []):
+                row = dict(finding)
+                row.setdefault("component_id", int(component_id))
+                row.setdefault("version_revision", int(entry.get("version_revision", 0)))
+                row["current"] = False
                 historical.append(row)
         return {
             "component_id": int(component_id),

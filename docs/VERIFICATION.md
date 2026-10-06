@@ -4,9 +4,9 @@ Status after the advisory-scoped security-state refactor and fresh Studionet dep
 
 ## Checks and evidence
 
-- Lightweight contract/architecture suite: `python -m pytest tests -q` — **19 passed** locally.
-- Official GenLayer Direct Mode suite (`genlayer-test==0.29.2`) — **10 passed** on Linux CI.
-- GenVM lint — **3 checks passed**; GenVM SDK/schema validation passed on Linux CI.
+- Lightweight contract/architecture suite: `python -m pytest tests -q` — **20 passed** locally, including full-capacity benign findings, relevant advisory admission at capacity, terminal replay retention after eviction, and same-GHSA reassessment after a version change.
+- Official GenLayer Direct Mode suite (`genlayer-test==0.29.2`) — **10 passed** on the previously submitted commit; this fix adds a capacity-boundary lifecycle case for the next CI run.
+- GenVM lint — **3 static checks passed** locally. This Windows host could not complete SDK validation because the cached GenVM archive is unavailable; schema and Direct Mode results for this fix are pending CI.
 - Frontend — `npm test` **6 passed**; `npm run build` passed. `npm audit` reports **0 vulnerabilities** after updating Vitest to 4.1.11.
 - GenLayer SDK receipt inspection confirmed writes return JSON data in `leader_receipt[].result.payload.readable`. The frontend now decodes the leader return and treats known contract errors, missing results, and zero IDs as failures while retaining the finalized transaction link.
 - GitHub Actions validates the submitted `main` commit with Python tests, GenVM lint and validation, Direct Mode, frontend tests, and build: [Actions runs](https://github.com/BeatyXO/Spatch/actions).
@@ -37,4 +37,5 @@ Status after the advisory-scoped security-state refactor and fresh Studionet dep
 - Identity verification cannot clear vulnerability or dependency recheck state: Direct Mode and live reads pass.
 - Patch identity alone does not establish security safety: the live component remained `SECURITY_REASSESS_REQUIRED` until reassessment of the same GHSA.
 - `UNRESOLVED` findings can be retried safely; terminal findings remain replay-protected: Direct Mode coverage passes.
+- Permissionless benign advisory traffic cannot permanently consume the finding bound: a full set of `NOT_AFFECTED` findings admits a new relevant advisory by evicting only a benign cache entry, while its assessment and replay key remain; a patch archives prior references and resets the replacement revision's findings. The 20-test local behavioral suite proves a vulnerable result and a same-GHSA post-patch reassessment across this boundary.
 - Downstream recovery stays blocked until every direct dependency is `ACTIVE`: Direct Mode and live lifecycle pass.

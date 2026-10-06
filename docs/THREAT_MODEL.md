@@ -19,10 +19,10 @@ Spatch records advisory-scoped judgments for exact package versions and propagat
 4. Sealing requires exact current identity proof for every component.
 5. Advisory output binds component ID, component revision, version revision, GHSA, verdict, reason, and fixed version.
 6. Custom validators independently fetch and re-evaluate; disagreement or malformed evidence fails closed.
-7. Findings are bounded and advisory/version scoped. A later `NOT_AFFECTED` cannot clear an `AFFECTED` or unresolved finding for another GHSA.
+7. Findings are bounded and advisory/version scoped. At capacity, only a terminal `NOT_AFFECTED` cache entry can be evicted; its full assessment and replay key remain durable. `AFFECTED` and `UNRESOLVED` findings are never evicted to make room. A later `NOT_AFFECTED` cannot clear an `AFFECTED` or unresolved finding for another GHSA.
 8. Identity verification cannot clear security findings, patch obligations, or dependency recheck state. Patch identity alone is not patch safety.
 9. Unresolved findings are retryable; terminal verdicts are immutable for the same version/advisory replay scope.
-10. Patch staging preserves old evidence, clears identity proof, increments the version revision, and carries outstanding advisories to the replacement.
+10. Patch staging preserves old finding references in bounded history and complete judgments in the assessment ledger, clears identity proof, increments the version revision, and carries outstanding advisories to the replacement. Findings for retired revisions do not consume replacement capacity.
 11. Downstream recovery requires every direct dependency to have current identity and aggregate `ACTIVE` state.
 12. Graph size, source responses, history, findings and carried obligations are bounded. Component ordering makes dependency cycles unreachable.
 

@@ -55,6 +55,16 @@ def row(cid, revision, version_revision, verdict, reason, fixed=""):
     }
 
 
+def bounded_ghsa(index):
+    alphabet = "23456789CFGHJMPQRVWX"
+    digits = ["2"] * 12
+    value = index
+    for position in range(11, -1, -1):
+        digits[position] = alphabet[value % len(alphabet)]
+        value //= len(alphabet)
+    return "GHSA-" + "".join(digits[:4]) + "-" + "".join(digits[4:8]) + "-" + "".join(digits[8:])
+
+
 def draft(contract, vm, creator):
     vm.sender = creator
     project_id = int(contract.create_project("Direct Mode Spatch graph"))
@@ -228,7 +238,6 @@ def test_direct_cross_advisory_not_affected_preserves_vulnerability(
     ]))
     assert int(contract.assess_advisory(project_id, GHSA)) > 0
     assert contract.get_component(dep_id)["status"] == "VULNERABLE"
-
     direct_vm.clear_mocks()
     advisory_sources(direct_vm, GHSA_B)
     dep = contract.get_component(dep_id)
@@ -243,6 +252,72 @@ def test_direct_cross_advisory_not_affected_preserves_vulnerability(
     assert {finding["advisory_id"]: finding["verdict"] for finding in findings} == {
         GHSA: "AFFECTED", GHSA_B: "NOT_AFFECTED",
     }
+
+
+def test_direct_finding_capacity_and_version_change_keep_relevant_advisory_assessable(
+    direct_deploy, direct_vm, direct_alice, direct_bob,
+):
+    contract = direct_deploy("contracts/spatch.py", sdk_version="v0.2.16")
+    project_id, dep_id, app_id = draft(contract, direct_vm, direct_alice)
+    verified_sealed(contract, direct_vm, project_id, dep_id, app_id, direct_bob)
+
+    benign_ids = [bounded_ghsa(index) for index in range(1, 33)]
+    for advisory_id in benign_ids:
+        direct_vm.clear_mocks()
+        advisory_sources(direct_vm, advisory_id)
+        dep = contract.get_component(dep_id)
+        app = contract.get_component(app_id)
+        direct_vm.mock_llm(".*", judgment([
+            row(dep_id, dep["revision"], dep["version_revision"], "NOT_AFFECTED", "VERSION_OUTSIDE_AFFECTED_RANGE"),
+            row(app_id, app["revision"], app["version_revision"], "NOT_AFFECTED", "PACKAGE_NOT_TARGETED"),
+        ]))
+        direct_vm.sender = direct_bob
+        assert int(contract.assess_advisory(project_id, advisory_id)) > 0
+
+    dep = contract.get_component(dep_id)
+    assert len(contract.get_findings(dep_id)["current"]) == 32
+    assert all(item["verdict"] == "NOT_AFFECTED" for item in contract.get_findings(dep_id)["current"])
+
+    # A public new GHSA is still evaluated and its affected verdict is retained
+    # by evicting only a benign entry when the per-version cap is full.
+    direct_vm.clear_mocks()
+    advisory_sources(direct_vm, GHSA)
+    dep = contract.get_component(dep_id)
+    app = contract.get_component(app_id)
+    direct_vm.mock_llm(".*", judgment([
+        row(dep_id, dep["revision"], dep["version_revision"], "AFFECTED", "VERSION_IN_AFFECTED_RANGE", "3.1.5"),
+        row(app_id, app["revision"], app["version_revision"], "NOT_AFFECTED", "PACKAGE_NOT_TARGETED"),
+    ]))
+    direct_vm.sender = direct_bob
+    first_assessment = int(contract.assess_advisory(project_id, GHSA))
+    assert contract.get_component(dep_id)["status"] == "VULNERABLE"
+    assert len(contract.get_findings(dep_id)["current"]) == 32
+    assert any(item["advisory_id"] == GHSA and item["verdict"] == "AFFECTED" for item in contract.get_findings(dep_id)["current"])
+    assert contract.assess_advisory(project_id, benign_ids[0]) == "ADVISORY_ALREADY_ASSESSED_FOR_CURRENT_REVISIONS"
+
+    dep = contract.get_component(dep_id)
+    direct_vm.sender = direct_alice
+    assert contract.patch_component(dep_id, "3.1.5", dep["revision"]) == "PATCH_VERSION_STAGED"
+    staged = contract.get_component(dep_id)
+    assert staged["findings"] == []
+    assert any(item["advisory_id"] == GHSA and item["verdict"] == "AFFECTED" for item in staged["history"][-1]["findings"])
+
+    identity(direct_vm, "jinja2", "3.1.5")
+    direct_vm.sender = direct_bob
+    assert int(contract.verify_patch(dep_id, staged["revision"])) > 0
+    patched = contract.get_component(dep_id)
+    direct_vm.clear_mocks()
+    advisory_sources(direct_vm, GHSA)
+    direct_vm.mock_llm(".*", judgment([
+        row(dep_id, patched["revision"], patched["version_revision"], "NOT_AFFECTED", "VERSION_OUTSIDE_AFFECTED_RANGE", "3.1.5"),
+    ]))
+    next_assessment = int(contract.assess_advisory(project_id, GHSA))
+    assert next_assessment > first_assessment
+    assert contract.get_component(dep_id)["status"] == "ACTIVE"
+    findings = contract.get_findings(dep_id)
+    assert findings["current"][0]["advisory_id"] == GHSA
+    assert findings["current"][0]["verdict"] == "NOT_AFFECTED"
+    assert any(item["advisory_id"] == GHSA and item["verdict"] == "AFFECTED" for item in findings["historical"])
 
 
 def test_direct_patch_identity_does_not_claim_safety_until_all_findings_reassessed(

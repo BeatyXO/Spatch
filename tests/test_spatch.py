@@ -206,6 +206,16 @@ def advisory_rows(contract, dep_verdict, dep_reason, app_verdict="NOT_AFFECTED",
     ]}
 
 
+def ghsa_for_index(index):
+    alphabet = "23456789cfghjmpqrvwx"
+    digits = ["2"] * 12
+    value = index
+    for position in range(11, -1, -1):
+        digits[position] = alphabet[value % len(alphabet)]
+        value //= len(alphabet)
+    return ("GHSA-" + "".join(digits[:4]) + "-" + "".join(digits[4:8]) + "-" + "".join(digits[8:])).upper()
+
+
 def test_components_start_unverified_and_seal_fails(runtime):
     contract, _, _ = runtime
     build_draft(contract)
@@ -433,6 +443,73 @@ def test_unresolved_advisory_is_retryable_but_terminal_result_replays_are_blocke
     count = contract.get_counts()["assessments"]
     assert contract.assess_advisory(U256(1), GHSA) == "ADVISORY_ALREADY_ASSESSED_FOR_CURRENT_REVISIONS"
     assert contract.get_counts()["assessments"] == count
+
+
+def test_relevant_advisory_survives_finding_capacity_and_version_change(runtime):
+    contract, gl, nondet = runtime
+    verify_and_seal(contract)
+
+    # Permissionless benign results may fill the bounded display cache, but each
+    # complete judgment and terminal replay key remains in its durable ledger.
+    benign_ids = [ghsa_for_index(index) for index in range(1, 33)]
+    for advisory_id in benign_ids:
+        nondet.answer = advisory_rows(
+            contract, "NOT_AFFECTED", "VERSION_OUTSIDE_AFFECTED_RANGE"
+        )
+        assert int(contract.assess_advisory(U256(1), advisory_id)) > 0
+    root = contract.get_component(U256(1))
+    assert len(root["findings"]) == 32
+    assert all(finding["verdict"] == "NOT_AFFECTED" for finding in root["findings"])
+
+    # A relevant GHSA remains assessable at the full boundary by reclaiming a
+    # benign slot, without changing terminal replay protection.
+    relevant_id = ghsa_for_index(33)
+    nondet.answer = advisory_rows(
+        contract, "AFFECTED", "VERSION_IN_AFFECTED_RANGE"
+    )
+    relevant_assessment = contract.assess_advisory(U256(1), relevant_id)
+    assert int(relevant_assessment) > 0
+    root = contract.get_component(U256(1))
+    assert root["status"] == "VULNERABLE"
+    assert len(root["findings"]) == 32
+    assert any(
+        finding["advisory_id"] == relevant_id and finding["verdict"] == "AFFECTED"
+        for finding in root["findings"]
+    )
+    assert contract.get_assessment(3)["advisory_id"] == benign_ids[0]
+    assert contract.assess_advisory(U256(1), benign_ids[0]) == "ADVISORY_ALREADY_ASSESSED_FOR_CURRENT_REVISIONS"
+
+    # Patch history preserves the affected GHSA reference while retired-version
+    # findings stop consuming the replacement version's bounded capacity.
+    gl.message.sender_address = CREATOR
+    assert contract.patch_component(U256(1), "3.1.6", U256(root["revision"])) == "PATCH_VERSION_STAGED"
+    staged = contract.get_component(U256(1))
+    assert staged["version_revision"] == 2
+    assert staged["findings"] == []
+    assert staged["history"][0]["findings"][-1]["advisory_id"] == relevant_id
+    assert staged["history"][0]["findings"][-1]["verdict"] == "AFFECTED"
+
+    gl.message.sender_address = OBSERVER
+    assert int(contract.verify_patch(U256(1), U256(staged["revision"]))) > 0
+    patched = contract.get_component(U256(1))
+    nondet.answer = {"results": [{
+        "component_id": 1,
+        "component_revision": patched["revision"],
+        "version_revision": 2,
+        "verdict": "NOT_AFFECTED",
+        "reason_code": "VERSION_OUTSIDE_AFFECTED_RANGE",
+        "fixed_version": "3.1.6",
+    }]}
+    reassessment = contract.assess_advisory(U256(1), relevant_id)
+    assert int(reassessment) > 0
+    final_root = contract.get_component(U256(1))
+    assert final_root["status"] == "ACTIVE"
+    assert final_root["version_revision"] == 2
+    findings = contract.get_findings(U256(1))
+    assert findings["current"][0]["advisory_id"] == relevant_id
+    assert findings["current"][0]["verdict"] == "NOT_AFFECTED"
+    historical = [row for row in findings["historical"] if row["advisory_id"] == relevant_id]
+    assert historical and historical[0]["verdict"] == "AFFECTED"
 
 
 def test_identity_verification_cannot_clear_security_recheck(runtime):

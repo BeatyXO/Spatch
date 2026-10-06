@@ -38,13 +38,13 @@ Replay key:
 project_id : component_id : version_revision : advisory_id
 ```
 
-An unresolved result does not consume a terminal replay key. Staging a patch appends the prior version, lifecycle state, finding references, advisory and assessment IDs to bounded history, increments `version_revision`, clears exact identity proof and carries affected/unresolved advisories into a pending list. Reassessing the same GHSA against the new revision is therefore eligible.
+An unresolved result does not consume a terminal replay key. The 32-entry component finding bound is protected from permissionless benign-result exhaustion: when full, a `NOT_AFFECTED` cache entry may be evicted to store a new result, while its complete assessment and consumed terminal replay key remain in the assessment ledger. `AFFECTED` and `UNRESOLVED` findings are never evicted to make room. Staging a patch appends the prior version, lifecycle state and compact finding references to bounded history, increments `version_revision`, clears exact identity proof, carries affected/unresolved advisories into a pending list, and starts an empty finding set for the new version. Full old judgments remain retrievable by assessment ID; retired findings no longer consume the replacement version's 32 slots. Reassessing the same GHSA against the new revision is therefore eligible.
 
 ## Bounds
 
 - 16 components and 32 edges per project;
 - 8 retired versions per component;
-- 32 findings and 16 carried advisory obligations per component;
+- 32 current-version findings and 16 carried advisory obligations per component; full NOT_AFFECTED assessments remain in the ledger if their cache entry is evicted;
 - source-body and user-text limits are explicit in `contracts/spatch.py`.
 
 Dependencies must point from a later-created dependent to an earlier-created dependency, making cycles unreachable by construction.
